@@ -86,8 +86,8 @@ Example flow:
 
 **User wants to ORDER leads (intent to buy — e.g. "I want leads", "how do I order", "عايز ليدز", "كمّل الأوردر", "ابدأ", "اطلب ليدز")**
 → STOP giving instructions. Instead send them directly to the dashboard with this exact format (adapt the message language to match the user's language):
-Arabic: "تمام! اضغط هنا وهتقدر تحدد عدد الليدز وتكمل الأوردر مباشرة:\n\n[اطلب الليدز دلوقتي →](https://avora.enigmasales.io/dashboard?tab=leads)"
-English: "Perfect — click here to pick your lead count and complete the order:\n\n[Request Leads Now →](https://avora.enigmasales.io/dashboard?tab=leads)"
+Arabic: "تمام! اضغط هنا وهتقدر تحدد عدد الليدز وتكمل الأوردر مباشرة:\n\n[اطلب الليدز دلوقتي →](http://localhost:3000/dashboard?tab=leads)"
+English: "Perfect — click here to pick your lead count and complete the order:\n\n[Request Leads Now →](http://localhost:3000/dashboard?tab=leads)"
 → Do NOT add WhatsApp instructions or manual steps. The dashboard handles everything.
 
 **PDF / export question**
