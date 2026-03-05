@@ -15,6 +15,9 @@ interface User {
   plan: string;
   pdfExportsUsed: number;
   createdAt: string;
+  monthlyRegenerateUsed: number;
+  regenerateResetMonth: string;
+  extraRegenerateCredits: number;
   _count: { leadOrders: number; generatedReports: number };
 }
 
@@ -69,6 +72,7 @@ export default function AdminPage() {
   // Order update state
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
   const [updatingPayment, setUpdatingPayment] = useState<string | null>(null);
+  const [grantingRegen, setGrantingRegen] = useState<string | null>(null);
 
   const checkAdmin = useCallback(async () => {
     const res = await fetch("/api/auth/me");
@@ -114,6 +118,24 @@ export default function AdminPage() {
     if (tab === "Payments") loadPayments();
     if (tab === "Orders" || tab === "Upload Leads") loadOrders();
     if (tab === "Audit Log") loadAuditLogs();
+  }
+
+  async function grantRegenCredit(userId: string) {
+    setGrantingRegen(userId);
+    try {
+      const res = await fetch("/api/admin/users/grant-regen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, credits: 1 }),
+      });
+      if (res.ok) {
+        await loadUsers();
+      } else {
+        alert("Failed to grant credit");
+      }
+    } finally {
+      setGrantingRegen(null);
+    }
   }
 
   async function updatePaymentStatus(paymentId: string, status: string) {
@@ -259,6 +281,9 @@ export default function AdminPage() {
                       PDF Exports
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
+                      Regen Credits
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
                       Orders
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
@@ -266,6 +291,9 @@ export default function AdminPage() {
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
                       Joined
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -288,6 +316,19 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-gray-600">
                         {u.pdfExportsUsed}/3
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs text-gray-600 space-y-0.5">
+                          <p>
+                            Monthly: {u.monthlyRegenerateUsed} used
+                            {u.regenerateResetMonth ? ` (${u.regenerateResetMonth})` : ""}
+                          </p>
+                          {u.extraRegenerateCredits > 0 && (
+                            <p className="text-[#1E6663] font-medium">
+                              +{u.extraRegenerateCredits} extra
+                            </p>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-gray-600">
                         {u._count.leadOrders}
                       </td>
@@ -296,6 +337,16 @@ export default function AdminPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-400 text-xs">
                         {new Date(u.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          loading={grantingRegen === u.id}
+                          onClick={() => grantRegenCredit(u.id)}
+                        >
+                          +1 Regen
+                        </Button>
                       </td>
                     </tr>
                   ))}

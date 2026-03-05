@@ -16,6 +16,9 @@ export async function GET() {
         pdfExportsUsed: true,
         language: true,
         createdAt: true,
+        monthlyRegenerateUsed: true,
+        regenerateResetMonth: true,
+        extraRegenerateCredits: true,
         _count: {
           select: { leadOrders: true, generatedReports: true },
         },

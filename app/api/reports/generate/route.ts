@@ -9,11 +9,59 @@ import {
 } from "@/lib/confidence";
 import { createAuditLog } from "@/lib/audit";
 
+function getCurrentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await requireAuth();
     const { language, forceMode } = await req.json();
 
+    // --- Regenerate credit check ---
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: session.id } });
+    const currentMonth = getCurrentMonthKey();
+
+    // Reset monthly counter if it's a new month
+    const needsReset = user.regenerateResetMonth !== currentMonth;
+    const monthlyUsed = needsReset ? 0 : user.monthlyRegenerateUsed;
+
+    // Determine if user has a free regenerate available
+    // Free monthly slot: monthlyUsed === 0
+    // Extra admin-granted credits: extraRegenerateCredits > 0
+    const hasFreeMonthly = monthlyUsed === 0;
+    const hasExtraCredit = user.extraRegenerateCredits > 0;
+    const canRegenerate = hasFreeMonthly || hasExtraCredit;
+
+    if (!canRegenerate) {
+      return NextResponse.json(
+        { error: "REGEN_CREDIT_REQUIRED" },
+        { status: 402 }
+      );
+    }
+
+    // Consume credit (extra credits first, then monthly slot)
+    if (hasExtraCredit && !hasFreeMonthly) {
+      await prisma.user.update({
+        where: { id: session.id },
+        data: {
+          extraRegenerateCredits: { decrement: 1 },
+          ...(needsReset ? { regenerateResetMonth: currentMonth, monthlyRegenerateUsed: 0 } : {}),
+        },
+      });
+    } else {
+      // Using the free monthly slot
+      await prisma.user.update({
+        where: { id: session.id },
+        data: {
+          monthlyRegenerateUsed: monthlyUsed + 1,
+          regenerateResetMonth: currentMonth,
+        },
+      });
+    }
+
+    // --- Fetch onboarding data ---
     const answers = await prisma.onboardingAnswer.findMany({
       where: { userId: session.id },
     });
@@ -78,7 +126,8 @@ export async function POST(req: NextRequest) {
       capacity: s6.capacity || "",
     };
 
-    const reports = await generateReports(context, mode);
+    const now = new Date();
+    const reports = await generateReports(context, mode, now);
 
     // Get latest version
     const latestReport = await prisma.generatedReport.findFirst({
@@ -108,6 +157,8 @@ export async function POST(req: NextRequest) {
       icpConfidence,
       dmuConfidence,
       strictPassed: strictGate.passed,
+      usedFreeMonthly: hasFreeMonthly,
+      usedExtraCredit: hasExtraCredit && !hasFreeMonthly,
     });
 
     return NextResponse.json({

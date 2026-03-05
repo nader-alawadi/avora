@@ -14,8 +14,11 @@ model User {
   plan            String    @default("LITE")
   language        String    @default("en")
   timezone        String    @default("UTC")
-  pdfExportsUsed  Int       @default(0)
-  isAdmin         Boolean   @default(false)
+  pdfExportsUsed          Int       @default(0)
+  isAdmin                 Boolean   @default(false)
+  monthlyRegenerateUsed   Int       @default(0)
+  regenerateResetMonth    String    @default("")
+  extraRegenerateCredits  Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
