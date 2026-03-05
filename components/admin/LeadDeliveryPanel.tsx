@@ -3,6 +3,34 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
+interface LeadFormData {
+  fullName: string;
+  roleTitle: string;
+  brandName: string;
+  email: string;
+  phone: string;
+  linkedinUrl: string;
+  country: string;
+  seniorityLevel: string;
+  buyingRole: string;
+  personalityType: string;
+  notes: string;
+}
+
+const EMPTY_FORM: LeadFormData = {
+  fullName: "",
+  roleTitle: "",
+  brandName: "",
+  email: "",
+  phone: "",
+  linkedinUrl: "",
+  country: "",
+  seniorityLevel: "",
+  buyingRole: "",
+  personalityType: "",
+  notes: "",
+};
+
 interface Order {
   id: string;
   leadCountMonthly: number;
@@ -31,31 +59,99 @@ const STATUS_BADGE: Record<string, "default" | "warning" | "success" | "danger" 
 
 const ACTIVE_STATUSES = ["PaidConfirmed", "InProgress"];
 
+const SENIORITY_OPTIONS = ["Junior", "Mid", "Senior", "Director", "C-Level"];
+const BUYING_ROLE_OPTIONS = ["Champion", "Economic Buyer", "Technical Buyer", "End User", "Influencer"];
+const PERSONALITY_OPTIONS = ["Analytical", "Driver", "Expressive", "Amiable"];
+
+const MAX_LEADS = 90;
+
+function Field({
+  label,
+  required,
+  error,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-600 mb-1">
+        {label}
+        {required && <span className="text-red-400 ml-0.5">*</span>}
+      </label>
+      {children}
+      {error && <p className="mt-0.5 text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+const inputCls =
+  "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663] bg-white";
+const inputErrCls =
+  "w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 bg-white";
+
 export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [leadsJson, setLeadsJson] = useState<Record<string, string>>({});
+  // stagedLeads[orderId] = array of lead form objects not yet delivered
+  const [stagedLeads, setStagedLeads] = useState<Record<string, LeadFormData[]>>({});
+  const [showModal, setShowModal] = useState(false);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [form, setForm] = useState<LeadFormData>(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState<Partial<Record<keyof LeadFormData, string>>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, string>>({});
 
-  async function uploadLeads(orderId: string) {
-    const json = leadsJson[orderId] || "";
-    if (!json.trim()) {
-      alert("Paste leads JSON first");
-      return;
-    }
+  function openAddLeadModal(orderId: string) {
+    setActiveOrderId(orderId);
+    setForm(EMPTY_FORM);
+    setFormErrors({});
+    setShowModal(true);
+  }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(json);
-    } catch {
-      alert("Invalid JSON format");
-      return;
-    }
+  function closeModal() {
+    setShowModal(false);
+    setActiveOrderId(null);
+  }
 
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      alert("JSON must be a non-empty array of leads");
-      return;
+  function set(field: keyof LeadFormData, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (formErrors[field]) {
+      setFormErrors((prev) => ({ ...prev, [field]: undefined }));
     }
+  }
+
+  function validateForm(): boolean {
+    const errors: Partial<Record<keyof LeadFormData, string>> = {};
+    if (!form.fullName.trim()) errors.fullName = "Required";
+    if (!form.roleTitle.trim()) errors.roleTitle = "Required";
+    if (!form.brandName.trim()) errors.brandName = "Required";
+    if (!form.email.trim()) errors.email = "Required";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  function addLead() {
+    if (!validateForm() || !activeOrderId) return;
+    setStagedLeads((prev) => ({
+      ...prev,
+      [activeOrderId]: [...(prev[activeOrderId] || []), { ...form }],
+    }));
+    closeModal();
+  }
+
+  function removeLead(orderId: string, index: number) {
+    setStagedLeads((prev) => ({
+      ...prev,
+      [orderId]: prev[orderId].filter((_, i) => i !== index),
+    }));
+  }
+
+  async function deliverLeads(orderId: string) {
+    const leads = stagedLeads[orderId] || [];
+    if (leads.length === 0) return;
 
     setUploading(orderId);
     setResults((prev) => ({ ...prev, [orderId]: "" }));
@@ -64,23 +160,26 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
       const res = await fetch("/api/admin/leads/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, leads: parsed }),
+        body: JSON.stringify({ orderId, leads }),
       });
       const d = await res.json();
 
       if (res.ok) {
         setResults((prev) => ({
           ...prev,
-          [orderId]: `✅ Uploaded ${d.count} leads. CRM entries created automatically.`,
+          [orderId]: `✅ Delivered ${d.count} leads to client CRM.`,
         }));
-        setLeadsJson((prev) => ({ ...prev, [orderId]: "" }));
+        setStagedLeads((prev) => ({ ...prev, [orderId]: [] }));
         setExpandedOrder(null);
         onRefresh();
       } else {
         setResults((prev) => ({ ...prev, [orderId]: `❌ Error: ${d.error}` }));
       }
     } catch {
-      setResults((prev) => ({ ...prev, [orderId]: "❌ Network error. Please try again." }));
+      setResults((prev) => ({
+        ...prev,
+        [orderId]: "❌ Network error. Please try again.",
+      }));
     } finally {
       setUploading(null);
     }
@@ -98,24 +197,26 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
         </Button>
       </div>
 
-      {/* Active orders needing delivery */}
+      {/* Active orders */}
       {activeOrders.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-[#1E6663] mb-3 flex items-center gap-2">
             <span className="w-2 h-2 bg-[#1E6663] rounded-full animate-pulse" />
             Ready for Delivery ({activeOrders.length})
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {activeOrders.map((order) => {
               const delivered = order.deliveredLeads.length;
+              const staged = stagedLeads[order.id] || [];
               const isExpanded = expandedOrder === order.id;
+              const canDeliver = staged.length > 0 && uploading !== order.id;
 
               return (
                 <div
                   key={order.id}
                   className="bg-white rounded-xl border border-gray-200 overflow-hidden"
                 >
-                  {/* Order header row */}
+                  {/* Order header */}
                   <div className="p-4 flex items-center gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -159,7 +260,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                       variant={isExpanded ? "ghost" : "secondary"}
                       onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
                     >
-                      {isExpanded ? "Cancel" : "Upload Leads"}
+                      {isExpanded ? "Collapse" : "Add Leads"}
                     </Button>
                   </div>
 
@@ -179,54 +280,123 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                     </div>
                   )}
 
-                  {/* Expanded upload area */}
+                  {/* Expanded lead entry area */}
                   {isExpanded && (
-                    <div className="border-t border-gray-100 p-4 bg-gray-50">
-                      <p className="text-xs font-semibold text-gray-600 mb-2">
-                        Leads JSON Array — paste the array of lead objects below
-                      </p>
-                      <textarea
-                        value={leadsJson[order.id] || ""}
-                        onChange={(e) =>
-                          setLeadsJson((prev) => ({ ...prev, [order.id]: e.target.value }))
-                        }
-                        rows={8}
-                        placeholder={`[
-  {
-    "fullName": "John Doe",
-    "roleTitle": "VP Sales",
-    "brandName": "Acme Corp",
-    "email": "john@acme.com",
-    "phone": "+1234567890",
-    "linkedinUrl": "https://linkedin.com/in/johndoe",
-    "personalityType": "Driver",
-    "buyingRole": "Champion",
-    "country": "US",
-    "seniorityLevel": "Senior"
-  }
-]`}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663] resize-none"
-                      />
-                      {results[order.id] && (
-                        <p className="mt-2 text-xs font-medium text-gray-700">{results[order.id]}</p>
-                      )}
-                      <div className="mt-3 flex gap-2 justify-end">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setExpandedOrder(null)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          loading={uploading === order.id}
-                          onClick={() => uploadLeads(order.id)}
-                        >
-                          Upload & Mark Delivered
-                        </Button>
+                    <div className="border-t border-gray-100 bg-gray-50">
+                      {/* Toolbar */}
+                      <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200 bg-white">
+                        <div className="flex items-center gap-3">
+                          {/* Progress pill */}
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-28 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-2 bg-gradient-to-r from-[#1E6663] to-[#28a99e] rounded-full transition-all duration-300"
+                                style={{ width: `${Math.min(100, (staged.length / MAX_LEADS) * 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-semibold text-[#1E6663]">
+                              {staged.length} / {MAX_LEADS} leads added
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openAddLeadModal(order.id)}
+                            disabled={staged.length >= MAX_LEADS}
+                          >
+                            + Add Lead
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            loading={uploading === order.id}
+                            onClick={() => deliverLeads(order.id)}
+                            disabled={!canDeliver}
+                          >
+                            Deliver All Leads
+                          </Button>
+                        </div>
                       </div>
+
+                      {/* Result message */}
+                      {results[order.id] && (
+                        <div className="px-4 py-2 bg-white border-b border-gray-100">
+                          <p className="text-xs font-medium text-gray-700">{results[order.id]}</p>
+                        </div>
+                      )}
+
+                      {/* Leads table */}
+                      {staged.length === 0 ? (
+                        <div className="py-10 text-center">
+                          <p className="text-2xl mb-2">👤</p>
+                          <p className="text-sm text-gray-400 font-medium">No leads added yet</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Click &ldquo;+ Add Lead&rdquo; to enter the first lead for this order
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-white border-b border-gray-200">
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">#</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Name</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Title</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Company</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Email</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Seniority</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Role</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Personality</th>
+                                <th className="px-4 py-2.5" />
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {staged.map((lead, idx) => (
+                                <tr key={idx} className="hover:bg-white/70 group">
+                                  <td className="px-4 py-2.5 text-xs text-gray-400">{idx + 1}</td>
+                                  <td className="px-4 py-2.5">
+                                    <p className="font-medium text-[#1F2A2A] text-xs whitespace-nowrap">{lead.fullName}</p>
+                                  </td>
+                                  <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">{lead.roleTitle}</td>
+                                  <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">{lead.brandName}</td>
+                                  <td className="px-4 py-2.5 text-xs text-gray-500">{lead.email || "—"}</td>
+                                  <td className="px-4 py-2.5">
+                                    {lead.seniorityLevel ? (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700 font-medium">
+                                        {lead.seniorityLevel}
+                                      </span>
+                                    ) : <span className="text-gray-300 text-xs">—</span>}
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    {lead.buyingRole ? (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-purple-50 text-purple-700 font-medium">
+                                        {lead.buyingRole}
+                                      </span>
+                                    ) : <span className="text-gray-300 text-xs">—</span>}
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    {lead.personalityType ? (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-700 font-medium">
+                                        {lead.personalityType}
+                                      </span>
+                                    ) : <span className="text-gray-300 text-xs">—</span>}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-right">
+                                    <button
+                                      onClick={() => removeLead(order.id, idx)}
+                                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all text-xs px-2 py-1 rounded hover:bg-red-50"
+                                    >
+                                      Remove
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -242,7 +412,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
         </div>
       )}
 
-      {/* All other orders (history) */}
+      {/* History table */}
       {otherOrders.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-gray-500 mb-3">
@@ -263,17 +433,13 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                 {otherOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-[#1F2A2A] text-sm">
-                        {order.user.name || "—"}
-                      </p>
+                      <p className="font-medium text-[#1F2A2A] text-sm">{order.user.name || "—"}</p>
                       <p className="text-xs text-gray-400">{order.user.email}</p>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{order.leadCountMonthly}</td>
                     <td className="px-4 py-3 text-gray-600">{order.deliveredLeads.length}</td>
                     <td className="px-4 py-3">
-                      <Badge variant={STATUS_BADGE[order.status] || "default"}>
-                        {order.status}
-                      </Badge>
+                      <Badge variant={STATUS_BADGE[order.status] || "default"}>{order.status}</Badge>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-400">
                       {new Date(order.createdAt).toLocaleDateString()}
@@ -282,6 +448,163 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Add Lead Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="font-bold text-[#1F2A2A] text-base">Add New Lead</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Fill in the lead details below</p>
+              </div>
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal body — scrollable */}
+            <div className="overflow-y-auto flex-1 px-6 py-5">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Row 1 */}
+                <Field label="Full Name" required error={formErrors.fullName}>
+                  <input
+                    className={formErrors.fullName ? inputErrCls : inputCls}
+                    placeholder="e.g. Sarah Johnson"
+                    value={form.fullName}
+                    onChange={(e) => set("fullName", e.target.value)}
+                  />
+                </Field>
+                <Field label="Job Title" required error={formErrors.roleTitle}>
+                  <input
+                    className={formErrors.roleTitle ? inputErrCls : inputCls}
+                    placeholder="e.g. VP of Sales"
+                    value={form.roleTitle}
+                    onChange={(e) => set("roleTitle", e.target.value)}
+                  />
+                </Field>
+
+                {/* Row 2 */}
+                <Field label="Company / Brand Name" required error={formErrors.brandName}>
+                  <input
+                    className={formErrors.brandName ? inputErrCls : inputCls}
+                    placeholder="e.g. Acme Corporation"
+                    value={form.brandName}
+                    onChange={(e) => set("brandName", e.target.value)}
+                  />
+                </Field>
+                <Field label="Email" required error={formErrors.email}>
+                  <input
+                    type="email"
+                    className={formErrors.email ? inputErrCls : inputCls}
+                    placeholder="e.g. sarah@acme.com"
+                    value={form.email}
+                    onChange={(e) => set("email", e.target.value)}
+                  />
+                </Field>
+
+                {/* Row 3 */}
+                <Field label="Phone">
+                  <input
+                    className={inputCls}
+                    placeholder="e.g. +1 555 000 1234"
+                    value={form.phone}
+                    onChange={(e) => set("phone", e.target.value)}
+                  />
+                </Field>
+                <Field label="LinkedIn URL">
+                  <input
+                    className={inputCls}
+                    placeholder="https://linkedin.com/in/..."
+                    value={form.linkedinUrl}
+                    onChange={(e) => set("linkedinUrl", e.target.value)}
+                  />
+                </Field>
+
+                {/* Row 4 */}
+                <Field label="Country">
+                  <input
+                    className={inputCls}
+                    placeholder="e.g. United States"
+                    value={form.country}
+                    onChange={(e) => set("country", e.target.value)}
+                  />
+                </Field>
+                <Field label="Seniority Level">
+                  <select
+                    className={inputCls}
+                    value={form.seniorityLevel}
+                    onChange={(e) => set("seniorityLevel", e.target.value)}
+                  >
+                    <option value="">Select level...</option>
+                    {SENIORITY_OPTIONS.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                {/* Row 5 */}
+                <Field label="Buying Role">
+                  <select
+                    className={inputCls}
+                    value={form.buyingRole}
+                    onChange={(e) => set("buyingRole", e.target.value)}
+                  >
+                    <option value="">Select role...</option>
+                    {BUYING_ROLE_OPTIONS.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Personality Type">
+                  <select
+                    className={inputCls}
+                    value={form.personalityType}
+                    onChange={(e) => set("personalityType", e.target.value)}
+                  >
+                    <option value="">Select type...</option>
+                    {PERSONALITY_OPTIONS.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                {/* Notes — full width */}
+                <div className="col-span-2">
+                  <Field label="Notes">
+                    <textarea
+                      className={`${inputCls} resize-none`}
+                      rows={3}
+                      placeholder="Any additional context about this lead..."
+                      value={form.notes}
+                      onChange={(e) => set("notes", e.target.value)}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50 rounded-b-2xl">
+              <p className="text-xs text-gray-400">
+                Fields marked with <span className="text-red-400">*</span> are required
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={closeModal}>
+                  Cancel
+                </Button>
+                <Button size="sm" variant="primary" onClick={addLead}>
+                  Add Lead →
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
