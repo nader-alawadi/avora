@@ -78,7 +78,7 @@ interface AttendanceModalProps {
 
 function AttendanceModal({ employee, onClose, onSave }: AttendanceModalProps) {
   const [date, setDate] = useState(todayISO());
-  const [status, setStatus] = useState("present");
+  const [status, setStatus] = useState("Present");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [saving, setSaving] = useState(false);
@@ -140,16 +140,16 @@ function AttendanceModal({ employee, onClose, onSave }: AttendanceModalProps) {
               onChange={(e) => setStatus(e.target.value)}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1E6663]/40 focus:border-[#1E6663]"
             >
-              <option value="present">Present</option>
-              <option value="absent">Absent</option>
-              <option value="late">Late</option>
-              <option value="half_day">Half Day</option>
-              <option value="remote">Remote</option>
+              <option value="Present">Present</option>
+              <option value="Late">Late</option>
+              <option value="Absent">Absent</option>
+              <option value="Holiday">Holiday</option>
+              <option value="Weekend">Weekend</option>
             </select>
           </div>
 
           {/* Times — only shown when relevant */}
-          {status !== "absent" && (
+          {status !== "Absent" && status !== "Holiday" && status !== "Weekend" && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">

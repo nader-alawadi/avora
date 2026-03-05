@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { countWorkingDays } from "@/lib/schedule";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -15,19 +16,6 @@ function getMonthBoundsUTC(): { monthStart: Date; monthStartStr: string; todaySt
   const todayStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
   return { monthStart, monthStartStr, todayStr };
-}
-
-function countWorkingDays(monthStart: string, today: string): number {
-  const start = new Date(`${monthStart}T00:00:00Z`);
-  const end = new Date(`${today}T00:00:00Z`);
-  let count = 0;
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    const dow = cursor.getUTCDay(); // 0=Sun, 6=Sat
-    if (dow !== 0 && dow !== 6) count++;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return count;
 }
 
 function computeBonus(qualified: number, rejected: number): number {

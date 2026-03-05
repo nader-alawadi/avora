@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { countWorkingDays, isAfterWorkEnd } from "@/lib/schedule";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -17,22 +18,6 @@ function getMonthBoundsUTC(): { monthStart: string; today: string } {
     monthStart: `${year}-${month}-01`,
     today: `${year}-${month}-${day}`,
   };
-}
-
-/**
- * Count Mon–Fri days from the first of the current month up to and including today (UTC).
- */
-function countWorkingDays(monthStart: string, today: string): number {
-  const start = new Date(`${monthStart}T00:00:00Z`);
-  const end = new Date(`${today}T00:00:00Z`);
-  let count = 0;
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    const dow = cursor.getUTCDay(); // 0=Sun, 6=Sat
-    if (dow !== 0 && dow !== 6) count++;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return count;
 }
 
 // ── GET /api/hr/attendance ────────────────────────────────────────────────────
@@ -53,7 +38,6 @@ export async function GET() {
   const { monthStart, today } = getMonthBoundsUTC();
 
   try {
-    // Fetch today's log and all logs for the current month in parallel
     const [todayLog, monthlyLogs] = await Promise.all([
       prisma.attendanceLog.findUnique({
         where: { adminTeamMemberId_date: { adminTeamMemberId: memberId, date: today } },
@@ -67,14 +51,14 @@ export async function GET() {
       }),
     ]);
 
-    // Build summary
+    // Build summary — Holiday/Weekend rows do not count against attendance
     let present = 0;
     let late = 0;
     let absent = 0;
     for (const log of monthlyLogs) {
       if (log.status === "Present") present++;
       else if (log.status === "Late") late++;
-      else absent++;
+      else if (log.status !== "Holiday" && log.status !== "Weekend") absent++;
     }
 
     const workingDays = countWorkingDays(monthStart, today);
@@ -127,33 +111,27 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === "checkin") {
-      // Late if check-in hour is >= 9 UTC (strictly after 09:00 means minute > 0 when hour == 9,
-      // or hour > 9; at exactly 09:00:00 it is "Present").
-      const utcHour = now.getUTCHours();
-      const utcMinute = now.getUTCMinutes();
-      const utcSecond = now.getUTCSeconds();
-      const isLate =
-        utcHour > 9 || (utcHour === 9 && (utcMinute > 0 || utcSecond > 0));
-      const status = isLate ? "Late" : "Present";
-
+      // Status is set to "Present" on check-in.
+      // Final status (Present vs Late) is evaluated at checkout based on:
+      //   whether the daily lead target was met before 18:00 Cairo time.
       const record = await prisma.attendanceLog.upsert({
         where: { adminTeamMemberId_date: { adminTeamMemberId: memberId, date: today } },
         create: {
           adminTeamMemberId: memberId,
           date: today,
           checkInTime: now,
-          status,
+          status: "Present",
         },
         update: {
           checkInTime: now,
-          status,
+          status: "Present",
         },
       });
 
       return NextResponse.json({ record });
     }
 
-    // checkout
+    // ── checkout ────────────────────────────────────────────────────────────
     const existing = await prisma.attendanceLog.findUnique({
       where: { adminTeamMemberId_date: { adminTeamMemberId: memberId, date: today } },
     });
@@ -165,11 +143,43 @@ export async function POST(req: NextRequest) {
     const checkInMs = new Date(existing.checkInTime).getTime();
     const hoursWorked = Math.round(((now.getTime() - checkInMs) / 3_600_000) * 100) / 100;
 
+    // Determine final status:
+    //   Late = checkout is after 18:00 Cairo AND daily lead target was NOT completed
+    //   Present = anything else
+    let finalStatus = "Present";
+
+    if (isAfterWorkEnd(now)) {
+      // Count leads delivered today by this member (deliveredByAdminId = memberId)
+      const todayStart = new Date(`${today}T00:00:00Z`);
+      const tomorrowStart = new Date(`${today}T00:00:00Z`);
+      tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1);
+
+      const [memberRecord, leadsToday] = await Promise.all([
+        prisma.adminTeamMember.findUnique({
+          where: { id: memberId },
+          select: { dailyLeadTarget: true },
+        }),
+        prisma.deliveredLead.count({
+          where: {
+            deliveredByAdminId: memberId,
+            deliveryDate: { gte: todayStart, lt: tomorrowStart },
+            status: { not: "Staged" },
+          },
+        }),
+      ]);
+
+      const target = memberRecord?.dailyLeadTarget ?? 10;
+      if (leadsToday < target) {
+        finalStatus = "Late";
+      }
+    }
+
     const record = await prisma.attendanceLog.update({
       where: { adminTeamMemberId_date: { adminTeamMemberId: memberId, date: today } },
       data: {
         checkOutTime: now,
         hoursWorked,
+        status: finalStatus,
       },
     });
 

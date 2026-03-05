@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { countWorkingDays } from "@/lib/schedule";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -22,19 +23,6 @@ function getUTCBounds() {
   return { now, year, month, day, monthStart, todayStart, tomorrowStart, monthStartStr, todayStr };
 }
 
-function countWorkingDays(monthStart: string, today: string): number {
-  const start = new Date(`${monthStart}T00:00:00Z`);
-  const end = new Date(`${today}T00:00:00Z`);
-  let count = 0;
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    const dow = cursor.getUTCDay();
-    if (dow !== 0 && dow !== 6) count++;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return count;
-}
-
 function computeBonus(qualified: number, rejected: number): number {
   return qualified * 50 - rejected * 25;
 }
@@ -49,11 +37,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (session.sessionType !== "adminTeam" || !session.adminTeamMemberId) {
+  if (session.sessionType !== "adminTeam") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const memberId = session.adminTeamMemberId;
+  // session.id === adminTeamMember.id for adminTeam sessions (see auth.ts)
+  const memberId = session.id;
   const { monthStart, todayStart, tomorrowStart, monthStartStr, todayStr } = getUTCBounds();
 
   try {

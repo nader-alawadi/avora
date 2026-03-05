@@ -85,10 +85,9 @@ export async function POST(req: NextRequest) {
     console.log("[deliver-single] CrmActivity created for crmLeadId:", crmLead.id);
 
     // 6. Mark DeliveredLead as Delivered; record who delivered it for HR bonus tracking
+    // For adminTeam sessions, admin.id === adminTeamMember.id (see auth.ts)
     const deliveredByAdminId =
-      admin.sessionType === "adminTeam" && admin.adminTeamMemberId
-        ? admin.adminTeamMemberId
-        : null;
+      admin.sessionType === "adminTeam" ? admin.id : null;
     await prisma.deliveredLead.update({
       where: { id: dl.id },
       data: {

@@ -88,6 +88,7 @@ export function EmployeeDashboard({ memberName, memberRole }: { memberName: stri
   const [profForm, setProfForm] = useState<Partial<Profile>>({});
   const [profSaving, setProfSaving] = useState(false);
   const [profMsg, setProfMsg] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // withdrawal state
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -160,6 +161,32 @@ export function EmployeeDashboard({ memberName, memberRole }: { memberName: stri
       if (res.ok) await loadAttendance();
     } catch { /* silent */ }
     setCheckingIn(false);
+  }
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    setProfMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/hr/profile/avatar", { method: "POST", body: fd });
+      const d = await res.json();
+      if (d.avatarUrl) {
+        setProfForm((f) => ({ ...f, avatarUrl: d.avatarUrl }));
+        setProfile((p) => p ? { ...p, avatarUrl: d.avatarUrl } : p);
+        setProfMsg("Avatar updated!");
+        setTimeout(() => setProfMsg(""), 3000);
+      } else {
+        setProfMsg(d.error || "Upload failed");
+      }
+    } catch {
+      setProfMsg("Upload failed");
+    }
+    setAvatarUploading(false);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
   }
 
   async function saveProfile() {
@@ -631,14 +658,18 @@ export function EmployeeDashboard({ memberName, memberRole }: { memberName: stri
                     </div>
                   )}
                   <div className="flex-1">
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Avatar URL</label>
-                    <input
-                      type="url"
-                      value={profForm.avatarUrl || ""}
-                      onChange={(e) => setProfForm(f => ({ ...f, avatarUrl: e.target.value }))}
-                      placeholder="https://…"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]"
-                    />
+                    <p className="text-xs font-medium text-gray-600 mb-1.5">Profile Photo</p>
+                    <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium cursor-pointer transition-colors ${avatarUploading ? "opacity-50 cursor-not-allowed" : "hover:border-[#1E6663] hover:text-[#1E6663]"}`}>
+                      {avatarUploading ? "Uploading…" : "Upload Photo"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="sr-only"
+                        disabled={avatarUploading}
+                        onChange={handleAvatarChange}
+                      />
+                    </label>
+                    <p className="text-[10px] text-gray-400 mt-1">JPG, PNG, WebP — max 5 MB</p>
                   </div>
                 </div>
 
