@@ -207,12 +207,11 @@ export default function ContactPage() {
 
     let welcome: string;
     if (userContext) {
-      const hasReport = userContext.hasReport;
-      const icpRef = hasReport && userContext.icpTitle ? ` targeting **${userContext.icpTitle}**` : "";
-      const companyRef = userContext.companyName ? ` at **${userContext.companyName}**` : "";
-      welcome = `Hi ${userContext.firstName}! 👋 I'm **Aria**, your AVORA GTM consultant.\n\nI can see your account${companyRef}${icpRef}. I can help you build a LinkedIn campaign, find target companies, analyze your strategy, or answer any GTM question.\n\nWhat would you like to work on today?`;
+      const companyRef = userContext.companyName ? ` at ${userContext.companyName}` : "";
+      const icpRef = userContext.hasReport && userContext.icpTitle ? ` I can see you're targeting **${userContext.icpTitle}**.` : "";
+      welcome = `Hey ${userContext.firstName} 👋 I'm Aria — your GTM consultant${companyRef}.${icpRef}\n\nWhat's the biggest challenge in your pipeline right now?`;
     } else {
-      welcome = `Hi! I'm **Aria**, your GTM consultant at AVORA. 👋\n\nI can help you with:\n- Understanding AVORA's features and pricing\n- GTM strategy, ICP, and outreach best practices\n- Building LinkedIn campaigns\n- Finding the right companies to target\n\nWhat can I help you with today?`;
+      welcome = `Hey 👋 I'm **Aria** — GTM consultant at AVORA.\n\nWhat are you trying to figure out today?`;
     }
 
     setMessages([{ role: "assistant", content: welcome }]);
@@ -271,17 +270,18 @@ export default function ContactPage() {
         const decoder = new TextDecoder();
         let buffer = "";
         let accumulated = "";
+        let done = false;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        while (!done) {
+          const { done: streamDone, value } = await reader.read();
+          if (streamDone) break;
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             const data = line.slice(6).trim();
-            if (data === "[DONE]") break;
+            if (data === "[DONE]") { done = true; break; }
             try {
               const parsed = JSON.parse(data);
               accumulated += parsed.text;
