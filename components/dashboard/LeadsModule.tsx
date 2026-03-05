@@ -41,13 +41,13 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
   const [leadCount, setLeadCount] = useState(10);
   const [creating, setCreating] = useState(false);
   const [buyingPack, setBuyingPack] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [paymentNotice, setPaymentNotice] = useState<"success" | "cancelled" | null>(null);
 
   const pricePerLead = user.plan === "PLUS" ? 5 : 15;
   const totalPrice = leadCount * pricePerLead;
 
-  useEffect(() => {
+  function refreshData() {
     fetch("/api/leads/order")
       .then((r) => r.json())
       .then((d) => setOrders(d.orders || []));
@@ -55,6 +55,19 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
     fetch("/api/payments/export-pack")
       .then((r) => r.json())
       .then((d) => setExportPack(d.exportPack || null));
+  }
+
+  useEffect(() => {
+    refreshData();
+
+    // Detect redirect back from Stripe Checkout and show inline notice
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    if (payment === "success" || payment === "cancelled") {
+      setPaymentNotice(payment);
+      // Clean the query string without a page reload
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, []);
 
   const STATUS_BADGES: Record<string, "default" | "warning" | "info" | "success" | "teal"> = {
@@ -69,65 +82,65 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
   async function createOrder() {
     setCreating(true);
     try {
+      // Step 1: create the order record
       const orderRes = await fetch("/api/leads/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reportId: report.id, leadCountMonthly: leadCount }),
       });
-
       const orderData = await orderRes.json();
       if (!orderRes.ok) {
         alert(orderData.error);
+        setCreating(false);
         return;
       }
 
-      // Create invoice
-      const invoiceRes = await fetch("/api/payments/invoice", {
+      // Step 2: open Stripe Checkout session
+      const stripeRes = await fetch("/api/payments/stripe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId: orderData.order.id,
           type: "LeadOrder",
+          orderId: orderData.order.id,
           amountUsd: orderData.order.totalPriceUsd,
+          leadCountMonthly: leadCount,
         }),
       });
+      const stripeData = await stripeRes.json();
+      if (!stripeRes.ok) {
+        alert(stripeData.error || "Failed to start payment. Please try again.");
+        setCreating(false);
+        return;
+      }
 
-      const invoiceData = await invoiceRes.json();
-
-      // Refresh orders
-      const ordersRes = await fetch("/api/leads/order");
-      const ordersData = await ordersRes.json();
-      setOrders(ordersData.orders || []);
-
-      alert(
-        `✅ Order created!\n\nPayoneer Invoice: ${invoiceData.invoiceLink}\nReference: ${invoiceData.reference}\n\nShare with admin for confirmation.`
-      );
+      // Step 3: redirect to Stripe-hosted Checkout (browser leaves this page)
+      window.location.href = stripeData.checkoutUrl;
     } catch {
       alert("Failed to create order. Please try again.");
-    } finally {
       setCreating(false);
     }
+    // Note: do NOT reset creating=false on the success path — browser redirects away
   }
 
   async function buyExportPack() {
     setBuyingPack(true);
     try {
-      const res = await fetch("/api/payments/export-pack", {
+      const stripeRes = await fetch("/api/payments/stripe", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "ExportPack", amountUsd: 100 }),
       });
-      const d = await res.json();
-      if (!res.ok) {
-        alert(d.error);
+      const stripeData = await stripeRes.json();
+      if (!stripeRes.ok) {
+        alert(stripeData.error || "Failed to start payment. Please try again.");
+        setBuyingPack(false);
         return;
       }
 
-      setExportPack(d.exportPack);
-      alert(
-        `✅ Export Pack requested!\n\nPayoneer Invoice: ${d.invoiceLink}\nReference: ${d.reference}\n\n50 credits ($100). Share with admin for confirmation.`
-      );
+      // Redirect to Stripe-hosted Checkout
+      window.location.href = stripeData.checkoutUrl;
     } catch {
       alert("Failed. Please try again.");
-    } finally {
       setBuyingPack(false);
     }
   }
@@ -193,6 +206,44 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
 
   return (
     <div className="space-y-6">
+      {/* Payment result banners (shown after Stripe redirect) */}
+      {paymentNotice === "success" && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
+          <span className="text-green-500 text-xl mt-0.5">✓</span>
+          <div className="flex-1">
+            <p className="font-semibold text-green-800 text-sm">Payment successful!</p>
+            <p className="text-green-700 text-xs mt-1">
+              Your payment has been received. Order status will update to{" "}
+              <strong>PaidConfirmed</strong> once our system confirms it — usually within a few seconds.
+            </p>
+          </div>
+          <button
+            onClick={() => { setPaymentNotice(null); refreshData(); }}
+            className="text-green-400 hover:text-green-600 text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {paymentNotice === "cancelled" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <span className="text-amber-500 text-xl mt-0.5">⚠</span>
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800 text-sm">Payment cancelled</p>
+            <p className="text-amber-700 text-xs mt-1">
+              You cancelled the payment. Your order was created but is not yet paid.
+              Click <strong>Request &amp; Pay</strong> again to complete the purchase.
+            </p>
+          </div>
+          <button
+            onClick={() => setPaymentNotice(null)}
+            className="text-amber-400 hover:text-amber-600 text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Lead Order Form */}
       <Card>
         <div className="flex items-center justify-between mb-4">
@@ -230,7 +281,7 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
                 ${totalPrice.toLocaleString()} USD
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Delivered within 7 business days via Payoneer
+                Delivered within 7 business days · Secure card payment via Stripe
               </p>
             </div>
             <Button
@@ -239,7 +290,7 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
               loading={creating}
               onClick={createOrder}
             >
-              Request & Get Invoice
+              Request &amp; Pay
             </Button>
           </div>
 
@@ -303,17 +354,6 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
                     </div>
 
                     <div className="flex flex-col gap-2 ml-4">
-                      {order.payments?.[0]?.invoiceLink && (
-                        <a
-                          href={order.payments[0].invoiceLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-[#1E6663] hover:underline"
-                        >
-                          View Invoice →
-                        </a>
-                      )}
-
                       {order.status === "Delivered" && user.plan === "PLUS" && (
                         <Button
                           size="sm"
@@ -346,7 +386,7 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
             <div>
               <h3 className="font-bold text-[#1F2A2A]">XLSX Export Pack</h3>
               <p className="text-sm text-gray-500 mt-1">
-                50 credits = $100 via Payoneer. Enables XLSX download for all your lead orders.
+                50 credits = $100 · Enables XLSX download for all your lead orders.
               </p>
               {exportPack && (
                 <div className="mt-2">
@@ -355,7 +395,7 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
                   >
                     {exportPack.status === "Confirmed"
                       ? "✓ Export Pack Active"
-                      : "⏳ Awaiting Admin Confirmation"}
+                      : "⏳ Processing Payment"}
                   </Badge>
                 </div>
               )}
@@ -371,7 +411,7 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
             )}
             {exportPack?.status === "Pending" && (
               <span className="text-xs text-amber-600 text-right">
-                Payment submitted.<br />Awaiting confirmation.
+                Payment processing.<br />Activates automatically.
               </span>
             )}
           </div>
