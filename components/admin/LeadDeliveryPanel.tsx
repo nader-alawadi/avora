@@ -1,7 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+
+// ── Types ────────────────────────────────────────────────
 
 interface LeadFormData {
   fullName: string;
@@ -15,6 +17,11 @@ interface LeadFormData {
   buyingRole: string;
   personalityType: string;
   notes: string;
+}
+
+// Staged lead has a DB id plus form fields
+interface StagedLead extends LeadFormData {
+  id: string;
 }
 
 const EMPTY_FORM: LeadFormData = {
@@ -58,12 +65,13 @@ const STATUS_BADGE: Record<string, "default" | "warning" | "success" | "danger" 
 };
 
 const ACTIVE_STATUSES = ["PaidConfirmed", "InProgress"];
+const MAX_LEADS = 90;
 
 const SENIORITY_OPTIONS = ["Junior", "Mid", "Senior", "Director", "C-Level"];
 const BUYING_ROLE_OPTIONS = ["Champion", "Economic Buyer", "Technical Buyer", "End User", "Influencer"];
 const PERSONALITY_OPTIONS = ["Analytical", "Driver", "Expressive", "Amiable"];
 
-const MAX_LEADS = 90;
+// ── Field wrapper ─────────────────────────────────────────
 
 function Field({
   label,
@@ -93,16 +101,76 @@ const inputCls =
 const inputErrCls =
   "w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 bg-white";
 
+// ── Main component ────────────────────────────────────────
+
 export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  // stagedLeads[orderId] = array of lead form objects not yet delivered
-  const [stagedLeads, setStagedLeads] = useState<Record<string, LeadFormData[]>>({});
+  // stagedLeads[orderId] = array of DB-persisted leads (with id)
+  const [stagedLeads, setStagedLeads] = useState<Record<string, StagedLead[]>>({});
+  // track which orders have already been fetched so we don't re-fetch on every expand
+  const [fetchedOrders, setFetchedOrders] = useState<Set<string>>(new Set());
+  const [fetchingStaged, setFetchingStaged] = useState<string | null>(null);
+
+  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [form, setForm] = useState<LeadFormData>(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof LeadFormData, string>>>({});
+  const [savingLead, setSavingLead] = useState(false);
+
+  // Delivery state
   const [uploading, setUploading] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, string>>({});
+
+  // ── Fetch staged leads from DB when an order is expanded ──
+
+  const fetchStagedLeads = useCallback(async (orderId: string) => {
+    setFetchingStaged(orderId);
+    try {
+      const res = await fetch(`/api/admin/leads/stage?orderId=${orderId}`);
+      const d = await res.json();
+      if (res.ok) {
+        setStagedLeads((prev) => ({
+          ...prev,
+          [orderId]: (d.leads ?? []).map((dl: Record<string, string | boolean>) => ({
+            id: String(dl.id),
+            fullName: String(dl.fullName || ""),
+            roleTitle: String(dl.roleTitle || ""),
+            brandName: String(dl.brandName || ""),
+            email: String(dl.email || ""),
+            phone: String(dl.phone || ""),
+            linkedinUrl: String(dl.linkedinUrl || ""),
+            country: String(dl.country || ""),
+            seniorityLevel: String(dl.seniorityLevel || ""),
+            buyingRole: String(dl.buyingRole || ""),
+            personalityType: String(dl.personalityType || ""),
+            notes: String(dl.notes || ""),
+          })),
+        }));
+        setFetchedOrders((prev) => new Set([...prev, orderId]));
+      }
+    } finally {
+      setFetchingStaged(null);
+    }
+  }, []);
+
+  function toggleOrder(orderId: string) {
+    if (expandedOrder === orderId) {
+      setExpandedOrder(null);
+    } else {
+      setExpandedOrder(orderId);
+      if (!fetchedOrders.has(orderId)) {
+        fetchStagedLeads(orderId);
+      }
+    }
+  }
+
+  // Re-fetch when orders list changes (e.g. after refresh) to clear stale fetch cache
+  useEffect(() => {
+    setFetchedOrders(new Set());
+  }, [orders]);
+
+  // ── Modal helpers ─────────────────────────────────────────
 
   function openAddLeadModal(orderId: string) {
     setActiveOrderId(orderId);
@@ -133,21 +201,59 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
     return Object.keys(errors).length === 0;
   }
 
-  function addLead() {
+  // ── Add lead — saves to DB immediately ───────────────────
+
+  async function addLead() {
     if (!validateForm() || !activeOrderId) return;
-    setStagedLeads((prev) => ({
-      ...prev,
-      [activeOrderId]: [...(prev[activeOrderId] || []), { ...form }],
-    }));
-    closeModal();
+
+    setSavingLead(true);
+    try {
+      const res = await fetch("/api/admin/leads/stage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: activeOrderId, lead: form }),
+      });
+      const d = await res.json();
+
+      if (!res.ok) {
+        alert(d.error || "Failed to save lead. Please try again.");
+        return;
+      }
+
+      // Add the DB record (with its id) to local state
+      setStagedLeads((prev) => ({
+        ...prev,
+        [activeOrderId]: [
+          ...(prev[activeOrderId] || []),
+          { id: d.lead.id, ...form },
+        ],
+      }));
+      closeModal();
+    } finally {
+      setSavingLead(false);
+    }
   }
 
-  function removeLead(orderId: string, index: number) {
+  // ── Remove lead — deletes from DB ─────────────────────────
+
+  async function removeLead(orderId: string, index: number) {
+    const lead = stagedLeads[orderId]?.[index];
+    if (!lead) return;
+
+    // Optimistic remove from UI
     setStagedLeads((prev) => ({
       ...prev,
       [orderId]: prev[orderId].filter((_, i) => i !== index),
     }));
+
+    await fetch("/api/admin/leads/stage", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: lead.id }),
+    });
   }
+
+  // ── Deliver — promotes Staged → Delivered, creates CRM leads ─
 
   async function deliverLeads(orderId: string) {
     const leads = stagedLeads[orderId] || [];
@@ -160,14 +266,14 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
       const res = await fetch("/api/admin/leads/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, leads }),
+        body: JSON.stringify({ orderId }),
       });
       const d = await res.json();
 
       if (res.ok) {
         setResults((prev) => ({
           ...prev,
-          [orderId]: `✅ Delivered ${d.count} leads to client CRM.`,
+          [orderId]: `✅ Delivered ${d.count} lead${d.count !== 1 ? "s" : ""} to client CRM.`,
         }));
         setStagedLeads((prev) => ({ ...prev, [orderId]: [] }));
         setExpandedOrder(null);
@@ -185,6 +291,8 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
     }
   }
 
+  // ── Render ────────────────────────────────────────────────
+
   const activeOrders = orders.filter((o) => ACTIVE_STATUSES.includes(o.status));
   const otherOrders = orders.filter((o) => !ACTIVE_STATUSES.includes(o.status));
 
@@ -198,7 +306,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
       </div>
 
       {/* Active orders */}
-      {activeOrders.length > 0 && (
+      {activeOrders.length > 0 ? (
         <div>
           <h3 className="text-sm font-semibold text-[#1E6663] mb-3 flex items-center gap-2">
             <span className="w-2 h-2 bg-[#1E6663] rounded-full animate-pulse" />
@@ -209,7 +317,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
               const delivered = order.deliveredLeads.length;
               const staged = stagedLeads[order.id] || [];
               const isExpanded = expandedOrder === order.id;
-              const canDeliver = staged.length > 0 && uploading !== order.id;
+              const isLoading = fetchingStaged === order.id;
 
               return (
                 <div
@@ -258,7 +366,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                     <Button
                       size="sm"
                       variant={isExpanded ? "ghost" : "secondary"}
-                      onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
+                      onClick={() => toggleOrder(order.id)}
                     >
                       {isExpanded ? "Collapse" : "Add Leads"}
                     </Button>
@@ -286,25 +394,28 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                       {/* Toolbar */}
                       <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200 bg-white">
                         <div className="flex items-center gap-3">
-                          {/* Progress pill */}
-                          <div className="flex items-center gap-2">
-                            <div className="h-2 w-28 bg-gray-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-2 bg-gradient-to-r from-[#1E6663] to-[#28a99e] rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, (staged.length / MAX_LEADS) * 100)}%` }}
-                              />
+                          {isLoading ? (
+                            <span className="text-xs text-gray-400 animate-pulse">Loading staged leads…</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-28 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-2 bg-gradient-to-r from-[#1E6663] to-[#28a99e] rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, (staged.length / MAX_LEADS) * 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-semibold text-[#1E6663]">
+                                {staged.length} / {MAX_LEADS} leads added
+                              </span>
                             </div>
-                            <span className="text-xs font-semibold text-[#1E6663]">
-                              {staged.length} / {MAX_LEADS} leads added
-                            </span>
-                          </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
                             variant="secondary"
                             onClick={() => openAddLeadModal(order.id)}
-                            disabled={staged.length >= MAX_LEADS}
+                            disabled={staged.length >= MAX_LEADS || isLoading}
                           >
                             + Add Lead
                           </Button>
@@ -313,7 +424,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                             variant="primary"
                             loading={uploading === order.id}
                             onClick={() => deliverLeads(order.id)}
-                            disabled={!canDeliver}
+                            disabled={staged.length === 0 || uploading === order.id || isLoading}
                           >
                             Deliver All Leads
                           </Button>
@@ -328,7 +439,11 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                       )}
 
                       {/* Leads table */}
-                      {staged.length === 0 ? (
+                      {isLoading ? (
+                        <div className="py-8 text-center">
+                          <div className="text-sm text-gray-400 animate-pulse">Fetching staged leads…</div>
+                        </div>
+                      ) : staged.length === 0 ? (
                         <div className="py-10 text-center">
                           <p className="text-2xl mb-2">👤</p>
                           <p className="text-sm text-gray-400 font-medium">No leads added yet</p>
@@ -347,14 +462,14 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Company</th>
                                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Email</th>
                                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Seniority</th>
-                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Role</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Buying Role</th>
                                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Personality</th>
                                 <th className="px-4 py-2.5" />
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {staged.map((lead, idx) => (
-                                <tr key={idx} className="hover:bg-white/70 group">
+                                <tr key={lead.id} className="hover:bg-white/70 group">
                                   <td className="px-4 py-2.5 text-xs text-gray-400">{idx + 1}</td>
                                   <td className="px-4 py-2.5">
                                     <p className="font-medium text-[#1F2A2A] text-xs whitespace-nowrap">{lead.fullName}</p>
@@ -404,9 +519,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
             })}
           </div>
         </div>
-      )}
-
-      {activeOrders.length === 0 && (
+      ) : (
         <div className="text-center py-10 text-gray-400 text-sm">
           No orders awaiting delivery right now.
         </div>
@@ -460,7 +573,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div>
                 <h3 className="font-bold text-[#1F2A2A] text-base">Add New Lead</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Fill in the lead details below</p>
+                <p className="text-xs text-gray-400 mt-0.5">Lead will be saved immediately to the staging queue</p>
               </div>
               <button
                 onClick={closeModal}
@@ -473,7 +586,6 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
             {/* Modal body — scrollable */}
             <div className="overflow-y-auto flex-1 px-6 py-5">
               <div className="grid grid-cols-2 gap-4">
-                {/* Row 1 */}
                 <Field label="Full Name" required error={formErrors.fullName}>
                   <input
                     className={formErrors.fullName ? inputErrCls : inputCls}
@@ -491,7 +603,6 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                   />
                 </Field>
 
-                {/* Row 2 */}
                 <Field label="Company / Brand Name" required error={formErrors.brandName}>
                   <input
                     className={formErrors.brandName ? inputErrCls : inputCls}
@@ -510,7 +621,6 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                   />
                 </Field>
 
-                {/* Row 3 */}
                 <Field label="Phone">
                   <input
                     className={inputCls}
@@ -528,7 +638,6 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                   />
                 </Field>
 
-                {/* Row 4 */}
                 <Field label="Country">
                   <input
                     className={inputCls}
@@ -543,21 +652,20 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                     value={form.seniorityLevel}
                     onChange={(e) => set("seniorityLevel", e.target.value)}
                   >
-                    <option value="">Select level...</option>
+                    <option value="">Select level…</option>
                     {SENIORITY_OPTIONS.map((o) => (
                       <option key={o} value={o}>{o}</option>
                     ))}
                   </select>
                 </Field>
 
-                {/* Row 5 */}
                 <Field label="Buying Role">
                   <select
                     className={inputCls}
                     value={form.buyingRole}
                     onChange={(e) => set("buyingRole", e.target.value)}
                   >
-                    <option value="">Select role...</option>
+                    <option value="">Select role…</option>
                     {BUYING_ROLE_OPTIONS.map((o) => (
                       <option key={o} value={o}>{o}</option>
                     ))}
@@ -569,20 +677,19 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                     value={form.personalityType}
                     onChange={(e) => set("personalityType", e.target.value)}
                   >
-                    <option value="">Select type...</option>
+                    <option value="">Select type…</option>
                     {PERSONALITY_OPTIONS.map((o) => (
                       <option key={o} value={o}>{o}</option>
                     ))}
                   </select>
                 </Field>
 
-                {/* Notes — full width */}
                 <div className="col-span-2">
                   <Field label="Notes">
                     <textarea
                       className={`${inputCls} resize-none`}
                       rows={3}
-                      placeholder="Any additional context about this lead..."
+                      placeholder="Any additional context about this lead…"
                       value={form.notes}
                       onChange={(e) => set("notes", e.target.value)}
                     />
@@ -594,14 +701,14 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
             {/* Modal footer */}
             <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50 rounded-b-2xl">
               <p className="text-xs text-gray-400">
-                Fields marked with <span className="text-red-400">*</span> are required
+                Fields marked <span className="text-red-400">*</span> are required
               </p>
               <div className="flex gap-2">
-                <Button size="sm" variant="ghost" onClick={closeModal}>
+                <Button size="sm" variant="ghost" onClick={closeModal} disabled={savingLead}>
                   Cancel
                 </Button>
-                <Button size="sm" variant="primary" onClick={addLead}>
-                  Add Lead →
+                <Button size="sm" variant="primary" onClick={addLead} loading={savingLead}>
+                  {savingLead ? "Saving…" : "Add Lead →"}
                 </Button>
               </div>
             </div>

@@ -356,6 +356,9 @@ export function CrmTab() {
 
   useEffect(() => {
     fetchLeads();
+    // Poll every 30 seconds so newly delivered leads appear without a manual page refresh
+    const interval = setInterval(fetchLeads, 30_000);
+    return () => clearInterval(interval);
   }, [fetchLeads]);
 
   function onDragEnd(result: DropResult) {
@@ -477,7 +480,15 @@ export function CrmTab() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-[#1F2A2A] text-lg">My CRM Pipeline</h2>
-          <span className="text-sm text-gray-400">{totalLeads} lead{totalLeads !== 1 ? "s" : ""} total</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400">{totalLeads} lead{totalLeads !== 1 ? "s" : ""} total</span>
+            <button
+              onClick={fetchLeads}
+              className="text-xs text-[#1E6663] hover:underline font-medium"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         <DragDropContext onDragEnd={onDragEnd}>

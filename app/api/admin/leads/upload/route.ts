@@ -3,12 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit";
 
+// POST /api/admin/leads/upload — deliver all Staged leads for an order to the client's CRM
 export async function POST(req: NextRequest) {
   try {
     const admin = await requireAdmin();
-    const { orderId, leads } = await req.json();
+    const { orderId } = await req.json();
 
-    if (!orderId || !Array.isArray(leads)) {
+    if (!orderId) {
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
@@ -17,44 +18,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    // Find all staged leads for this order
+    const stagedLeads = await prisma.deliveredLead.findMany({
+      where: { orderId, status: "Staged" },
+    });
+
+    if (stagedLeads.length === 0) {
+      return NextResponse.json({ error: "No staged leads to deliver" }, { status: 400 });
+    }
+
     const deliveryBatch = `Batch-${Date.now()}`;
     const deliveryDate = new Date();
 
-    // Create DeliveredLead records one-by-one to get their IDs
-    const deliveredLeads = await prisma.$transaction(
-      leads.map((lead: Record<string, unknown>) =>
-        prisma.deliveredLead.create({
-          data: {
-            orderId,
-            contactId: String(lead.contactId || ""),
-            fullName: String(lead.fullName || ""),
-            roleTitle: String(lead.roleTitle || ""),
-            linkedinUrl: String(lead.linkedinUrl || ""),
-            email: String(lead.email || ""),
-            phone: String(lead.phone || ""),
-            personalityType: String(lead.personalityType || ""),
-            personalityAnalysisUrl: String(lead.personalityAnalysisUrl || ""),
-            companyId: String(lead.companyId || ""),
-            brandName: String(lead.brandName || ""),
-            notes: String(lead.notes || ""),
-            country: String(lead.country || ""),
-            techStacks: String(lead.techStacks || ""),
-            seniorityLevel: String(lead.seniorityLevel || ""),
-            buyingRole: String(lead.buyingRole || ""),
-            preferredChannel: String(lead.preferredChannel || ""),
-            isPrimaryContact: Boolean(lead.isPrimaryContact),
-            whatsappAvailable: Boolean(lead.whatsappAvailable),
-            deliveryBatch,
-            deliveryDate,
-            status: "Delivered",
-          },
-        })
-      )
-    );
+    // Promote all Staged → Delivered
+    await prisma.deliveredLead.updateMany({
+      where: { orderId, status: "Staged" },
+      data: { status: "Delivered", deliveryBatch, deliveryDate },
+    });
 
-    // Auto-create CrmLead entries for the client (stage = NewLead)
+    // Create CrmLead entries for the order's user (one per delivered lead)
     await prisma.crmLead.createMany({
-      data: deliveredLeads.map((dl) => ({
+      data: stagedLeads.map((dl) => ({
         userId: order.userId,
         deliveredLeadId: dl.id,
         fullName: dl.fullName || "",
@@ -64,20 +48,19 @@ export async function POST(req: NextRequest) {
         email: dl.email || "",
         phone: dl.phone || "",
         personalityType: dl.personalityType || "",
-        personalityAnalysisUrl: dl.personalityAnalysisUrl || "",
         buyingRole: dl.buyingRole || "",
-        preferredChannel: dl.preferredChannel || "",
         seniorityLevel: dl.seniorityLevel || "",
         country: dl.country || "",
-        techStacks: dl.techStacks || "",
-        whatsappAvailable: dl.whatsappAvailable,
         stage: "NewLead",
       })),
     });
 
-    // Create initial CrmActivity "lead_created" for each CRM lead
+    // Fetch the newly created CRM lead IDs to create activity logs
     const newCrmLeads = await prisma.crmLead.findMany({
-      where: { userId: order.userId, deliveredLeadId: { in: deliveredLeads.map((d) => d.id) } },
+      where: {
+        userId: order.userId,
+        deliveredLeadId: { in: stagedLeads.map((d) => d.id) },
+      },
       select: { id: true },
     });
 
@@ -91,19 +74,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Mark order as Delivered
+    // Mark the order as Delivered
     await prisma.leadOrder.update({
       where: { id: orderId },
       data: { status: "Delivered" },
     });
 
-    await createAuditLog(admin.id, "LEADS_UPLOADED", "LeadOrder", orderId, {
-      count: deliveredLeads.length,
+    await createAuditLog(admin.id, "LEADS_DELIVERED", "LeadOrder", orderId, {
+      count: stagedLeads.length,
       deliveryBatch,
       crmLeadsCreated: newCrmLeads.length,
     });
 
-    return NextResponse.json({ count: deliveredLeads.length, deliveryBatch });
+    return NextResponse.json({ count: stagedLeads.length, deliveryBatch });
   } catch {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
