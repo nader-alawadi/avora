@@ -162,7 +162,7 @@ export default function LandingPage() {
               <ul className="mt-6 space-y-3 text-sm text-gray-600">
                 <li className="flex gap-2">✓ Full GTM strategy generation</li>
                 <li className="flex gap-2">✓ ICP, DMU, ABM, Outreach Playbook</li>
-                <li className="flex gap-2">✓ Up to 2 PDF exports</li>
+                <li className="flex gap-2">✓ Up to 3 PDF exports</li>
                 <li className="flex gap-2">✓ Lead requests at $15/lead</li>
                 <li className="flex gap-2 text-gray-400">✗ Leads Dashboard</li>
                 <li className="flex gap-2 text-gray-400">✗ XLSX export</li>

@@ -18,13 +18,13 @@ export function PdfExportButton({
 }: PdfExportButtonProps) {
   const [loading, setLoading] = useState(false);
 
-  const isLocked = plan === "LITE" && exportsUsed >= 2;
-  const remaining = plan === "LITE" ? Math.max(0, 2 - exportsUsed) : null;
+  const isLocked = plan === "LITE" && exportsUsed >= 3;
+  const remaining = plan === "LITE" ? Math.max(0, 3 - exportsUsed) : null;
 
   async function handleExport() {
     if (isLocked) {
       alert(
-        "You've used your 2 free PDF exports (LITE limit).\nUpgrade to PLUS for unlimited exports."
+        "You've used your 3 free PDF exports (LITE limit).\nUpgrade to PLUS for unlimited exports."
       );
       return;
     }
@@ -76,7 +76,7 @@ export function PdfExportButton({
       loading={loading}
       onClick={handleExport}
       disabled={isLocked}
-      title={isLocked ? "LITE limit reached (2/2)" : `Export PDF${remaining !== null ? ` (${remaining} left)` : ""}`}
+      title={isLocked ? "LITE limit reached (3/3)" : `Export PDF${remaining !== null ? ` (${remaining} left)` : ""}`}
     >
       {isLocked
         ? "🔒 PDF (Limit Reached)"

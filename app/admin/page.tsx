@@ -286,7 +286,7 @@ export default function AdminPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-gray-600">
-                        {u.pdfExportsUsed}/2
+                        {u.pdfExportsUsed}/3
                       </td>
                       <td className="px-4 py-3 text-gray-600">
                         {u._count.leadOrders}

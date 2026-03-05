@@ -205,7 +205,7 @@ export default function DashboardPage() {
                 value={
                   user?.plan === "PLUS"
                     ? "Unlimited"
-                    : `${user?.pdfExportsUsed || 0}/2`
+                    : `${user?.pdfExportsUsed || 0}/3`
                 }
                 subtitle={user?.plan === "LITE" ? "LITE limit" : "PLUS plan"}
                 color="teal"

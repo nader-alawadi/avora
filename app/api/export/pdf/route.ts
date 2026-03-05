@@ -16,11 +16,11 @@ export async function POST(req: NextRequest) {
         select: { pdfExportsUsed: true },
       });
 
-      if ((user?.pdfExportsUsed || 0) >= 2) {
+      if ((user?.pdfExportsUsed || 0) >= 3) {
         return NextResponse.json(
           {
             error:
-              "LITE plan is limited to 2 PDF exports total. Upgrade to PLUS for unlimited exports.",
+              "LITE plan is limited to 3 PDF exports total. Upgrade to PLUS for unlimited exports.",
             limitReached: true,
           },
           { status: 403 }
