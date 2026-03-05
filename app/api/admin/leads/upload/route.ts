@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  console.log("[upload] session type:", admin.sessionType, "| role:", admin.adminRole ?? "n/a", "| id:", admin.id);
+
   try {
     const { orderId } = await req.json();
     console.log("[upload] orderId:", orderId);
@@ -104,10 +106,15 @@ export async function POST(req: NextRequest) {
       data: { status: "Delivered" },
     });
 
-    await createAuditLog(admin.id, "LEADS_DELIVERED", "LeadOrder", orderId, {
+    // For AdminTeamMember sessions, admin.id is NOT a User.id — pass null to avoid FK violation
+    const auditUserId = admin.sessionType === "user" ? admin.id : null;
+    await createAuditLog(auditUserId, "LEADS_DELIVERED", "LeadOrder", orderId, {
       count: stagedLeads.length,
       deliveryBatch,
       crmLeadsCreated: crmLeadsCreated.length,
+      actorType: admin.sessionType,
+      actorId: admin.id,
+      actorEmail: admin.email,
     });
 
     console.log("[upload] Done. count:", stagedLeads.length);
