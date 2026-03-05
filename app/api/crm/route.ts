@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/auth";
 export async function GET() {
   try {
     const session = await requireAuth();
+    console.log("[crm GET] session.id:", session.id, "email:", session.email);
 
     const leads = await prisma.crmLead.findMany({
       where: { userId: session.id },
@@ -15,8 +16,11 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
+    console.log("[crm GET] found", leads.length, "CrmLeads for userId:", session.id);
+
     return NextResponse.json({ leads });
-  } catch {
+  } catch (err) {
+    console.error("[crm GET] error:", err);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }
@@ -95,7 +99,8 @@ export async function PATCH(req: NextRequest) {
     });
 
     return NextResponse.json({ lead: finalLead ?? updated });
-  } catch {
+  } catch (err) {
+    console.error("[crm PATCH] error:", err);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }

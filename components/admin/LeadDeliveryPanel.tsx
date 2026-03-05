@@ -47,7 +47,7 @@ interface Order {
   adminNotes?: string;
   createdAt: string;
   user: { name: string | null; email: string };
-  deliveredLeads: { id: string }[];
+  deliveredLeads: { id: string; status: string }[];
 }
 
 interface Props {
@@ -314,7 +314,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
           </h3>
           <div className="space-y-4">
             {activeOrders.map((order) => {
-              const delivered = order.deliveredLeads.length;
+              const delivered = order.deliveredLeads.filter((l) => l.status === "Delivered").length;
               const staged = stagedLeads[order.id] || [];
               const isExpanded = expandedOrder === order.id;
               const isLoading = fetchingStaged === order.id;
@@ -550,7 +550,7 @@ export function LeadDeliveryPanel({ orders, onRefresh }: Props) {
                       <p className="text-xs text-gray-400">{order.user.email}</p>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{order.leadCountMonthly}</td>
-                    <td className="px-4 py-3 text-gray-600">{order.deliveredLeads.length}</td>
+                    <td className="px-4 py-3 text-gray-600">{order.deliveredLeads.filter((l) => l.status === "Delivered").length}</td>
                     <td className="px-4 py-3">
                       <Badge variant={STATUS_BADGE[order.status] || "default"}>{order.status}</Badge>
                     </td>
