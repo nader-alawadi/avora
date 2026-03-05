@@ -2,6 +2,9 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { AvoraLogo } from "@/components/ui/AvoraLogo";
+import { SkeletonDashboard } from "@/components/ui/SkeletonLoader";
 import { KpiCard } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -118,10 +121,14 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#1E6663] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-gray-500">Loading your dashboard...</p>
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-16">
+            <AvoraLogo size={32} />
+          </div>
+        </header>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <SkeletonDashboard />
         </div>
       </div>
     );
@@ -134,10 +141,7 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-[#1E6663] rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
-              </div>
-              <span className="font-bold text-[#1F2A2A]">AVORA</span>
+              <AvoraLogo size={32} />
               <Badge variant={user?.plan === "PLUS" ? "success" : "default"}>
                 {user?.plan || "LITE"}
               </Badge>
@@ -193,6 +197,7 @@ export default function DashboardPage() {
                 variant="secondary"
                 loading={generating}
                 onClick={handleRegenerate}
+                className={generating ? "pulse-glow" : ""}
               >
                 {report ? "Regenerate" : "Generate Strategy"}
               </Button>
@@ -200,40 +205,47 @@ export default function DashboardPage() {
           </div>
 
           {report ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-xs text-gray-500 mb-1">ICP Confidence</p>
-                <ConfidenceMeter
-                  label=""
-                  value={report.icpConfidence}
-                  size="sm"
-                />
-              </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-xs text-gray-500 mb-1">DMU Confidence</p>
-                <ConfidenceMeter
-                  label=""
-                  value={report.dmuConfidence}
-                  size="sm"
-                />
-              </div>
-              <KpiCard
-                title="Strict Gate"
-                value={report.strictPassed ? "Passed ✓" : "Not Passed"}
-                subtitle={report.strictPassed ? "Lead orders enabled" : "Complete onboarding"}
-                color={report.strictPassed ? "green" : "coral"}
-              />
-              <KpiCard
-                title="PDF Exports"
-                value={
-                  user?.plan === "PLUS"
-                    ? "Unlimited"
-                    : `${user?.pdfExportsUsed || 0}/3`
-                }
-                subtitle={user?.plan === "LITE" ? "LITE limit" : "PLUS plan"}
-                color="teal"
-              />
-            </div>
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+            >
+              {[
+                <div key="icp" className="bg-white rounded-xl border border-gray-100 p-4 card-hover">
+                  <p className="text-xs text-gray-500 mb-1">ICP Confidence</p>
+                  <ConfidenceMeter label="" value={report.icpConfidence} size="sm" />
+                </div>,
+                <div key="dmu" className="bg-white rounded-xl border border-gray-100 p-4 card-hover">
+                  <p className="text-xs text-gray-500 mb-1">DMU Confidence</p>
+                  <ConfidenceMeter label="" value={report.dmuConfidence} size="sm" />
+                </div>,
+                <KpiCard
+                  key="gate"
+                  title="Strict Gate"
+                  value={report.strictPassed ? "Passed ✓" : "Not Passed"}
+                  subtitle={report.strictPassed ? "Lead orders enabled" : "Complete onboarding"}
+                  color={report.strictPassed ? "green" : "coral"}
+                />,
+                <KpiCard
+                  key="pdf"
+                  title="PDF Exports"
+                  value={user?.plan === "PLUS" ? "Unlimited" : `${user?.pdfExportsUsed || 0}/3`}
+                  subtitle={user?.plan === "LITE" ? "LITE limit" : "PLUS plan"}
+                  color="teal"
+                />,
+              ].map((card, i) => (
+                <motion.div
+                  key={i}
+                  variants={{
+                    hidden: { opacity: 0, y: 16 },
+                    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+                  }}
+                >
+                  {card}
+                </motion.div>
+              ))}
+            </motion.div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
               <div className="text-4xl mb-3">🚀</div>
@@ -302,19 +314,24 @@ export default function DashboardPage() {
               </nav>
             </div>
 
-            <div>
-              {activeTab === "icp" && <IcpTab data={report.icp} />}
-              {activeTab === "dmu" && <DmuTab data={report.dmu} />}
-              {activeTab === "abm" && <AbmTab data={report.abm} />}
-              {activeTab === "outreach" && <OutreachTab data={report.outreach} />}
-              {activeTab === "lookalike" && <LookalikeTab data={report.lookalike} />}
-              {activeTab === "leads" && (
-                <LeadsModule
-                  report={report}
-                  user={user!}
-                />
-              )}
-            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+              >
+                {activeTab === "icp" && <IcpTab data={report.icp} />}
+                {activeTab === "dmu" && <DmuTab data={report.dmu} />}
+                {activeTab === "abm" && <AbmTab data={report.abm} />}
+                {activeTab === "outreach" && <OutreachTab data={report.outreach} />}
+                {activeTab === "lookalike" && <LookalikeTab data={report.lookalike} />}
+                {activeTab === "leads" && (
+                  <LeadsModule report={report} user={user!} />
+                )}
+              </motion.div>
+            </AnimatePresence>
           </>
         )}
       </div>

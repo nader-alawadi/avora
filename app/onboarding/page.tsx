@@ -1,8 +1,11 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { ConfidenceMeter } from "@/components/ui/ConfidenceMeter";
+import { AvoraLogo } from "@/components/ui/AvoraLogo";
+import { Confetti } from "@/components/ui/Confetti";
 import { OnboardingStep0 } from "@/components/onboarding/Step0";
 import { OnboardingStep1 } from "@/components/onboarding/Step1";
 import { OnboardingStep2 } from "@/components/onboarding/Step2";
@@ -24,21 +27,19 @@ const STEP_TITLES = [
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
+  const [prevStep, setPrevStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Record<string, string>>>({});
   const [confidence, setConfidence] = useState({ icp: 0, dmu: 0 });
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const direction = useRef<1 | -1>(1);
 
   useEffect(() => {
-    // Load existing answers
     fetch("/api/onboarding/answers")
       .then((r) => r.json())
-      .then((d) => {
-        if (d.answers) setAnswers(d.answers);
-      })
+      .then((d) => { if (d.answers) setAnswers(d.answers); })
       .catch(() => {});
-
-    // Load confidence
     refreshConfidence();
   }, []);
 
@@ -50,6 +51,12 @@ export default function OnboardingPage() {
       })
       .catch(() => {});
   }, []);
+
+  function goToStep(next: number) {
+    direction.current = next > currentStep ? 1 : -1;
+    setPrevStep(currentStep);
+    setCurrentStep(next);
+  }
 
   async function saveStep(step: number, stepAnswers: Record<string, string>) {
     setSaving(true);
@@ -70,6 +77,7 @@ export default function OnboardingPage() {
 
   async function handleGenerateReport() {
     setGenerating(true);
+    setShowConfetti(true);
     try {
       const lang = answers[0]?.language || "en";
       const res = await fetch("/api/reports/generate", {
@@ -79,14 +87,17 @@ export default function OnboardingPage() {
       });
 
       if (res.ok) {
-        router.push("/dashboard");
+        // Let confetti play briefly before redirect
+        setTimeout(() => router.push("/dashboard"), 2200);
       } else {
+        setShowConfetti(false);
         const d = await res.json();
         alert(d.error || "Generation failed. Please check your answers.");
+        setGenerating(false);
       }
     } catch {
+      setShowConfetti(false);
       alert("Network error. Please try again.");
-    } finally {
       setGenerating(false);
     }
   }
@@ -100,33 +111,48 @@ export default function OnboardingPage() {
     language: answers[0]?.language || "en",
   };
 
+  const stepVariants = {
+    enter: (d: number) => ({ opacity: 0, x: d * 40 }),
+    center: { opacity: 1, x: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } },
+    exit: (d: number) => ({ opacity: 0, x: d * -40, transition: { duration: 0.2 } }),
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {showConfetti && (
+        <Confetti onDone={() => setShowConfetti(false)} />
+      )}
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-[#1E6663] rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
-              </div>
-              <span className="font-bold text-[#1F2A2A]">AVORA</span>
-              <span className="text-gray-400 text-sm">/ Onboarding</span>
+              <AvoraLogo size={30} showTagline taglineColor="#9ca3af" />
+              <span className="text-gray-300">/</span>
+              <span className="text-gray-500 text-sm font-medium">Onboarding</span>
             </div>
             {saving && (
-              <span className="text-xs text-gray-400 animate-pulse">Saving...</span>
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-xs text-gray-400 animate-pulse"
+              >
+                Saving…
+              </motion.span>
             )}
           </div>
 
-          {/* Progress bar */}
+          {/* Animated progress bar */}
           <div className="flex items-center gap-3">
-            <div className="flex-1 bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-[#1E6663] h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
+            <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+              <motion.div
+                className="h-2 bg-gradient-to-r from-[#1E6663] to-[#4ecdc4] rounded-full"
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               />
             </div>
-            <span className="text-xs text-gray-500 whitespace-nowrap">
+            <span className="text-xs text-gray-400 whitespace-nowrap">
               Step {currentStep + 1} of {STEP_TITLES.length}
             </span>
           </div>
@@ -136,10 +162,10 @@ export default function OnboardingPage() {
             {STEP_TITLES.map((title, i) => (
               <button
                 key={i}
-                onClick={() => i < currentStep && setCurrentStep(i)}
-                className={`flex-1 h-1 rounded-full transition-colors ${
+                onClick={() => i < currentStep && goToStep(i)}
+                className={`flex-1 h-1.5 rounded-full transition-all duration-300 ${
                   i < currentStep
-                    ? "bg-[#1E6663] cursor-pointer"
+                    ? "bg-[#1E6663] cursor-pointer hover:bg-[#175553]"
                     : i === currentStep
                     ? "bg-[#FF6B63]"
                     : "bg-gray-200 cursor-default"
@@ -155,57 +181,76 @@ export default function OnboardingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main content */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8">
-              <div className="mb-6">
-                <div className="text-xs font-semibold text-[#1E6663] uppercase tracking-wide mb-1">
-                  Step {currentStep + 1}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-6 md:p-8">
+                <div className="mb-6">
+                  <div className="text-xs font-bold text-[#1E6663] uppercase tracking-widest mb-1">
+                    Step {currentStep + 1}
+                  </div>
+                  <h2 className="text-xl font-bold text-[#1F2A2A]">
+                    {STEP_TITLES[currentStep]}
+                  </h2>
                 </div>
-                <h2 className="text-xl font-bold text-[#1F2A2A]">
-                  {STEP_TITLES[currentStep]}
-                </h2>
-              </div>
 
-              {currentStep === 0 && <OnboardingStep0 {...stepProps} />}
-              {currentStep === 1 && <OnboardingStep1 {...stepProps} />}
-              {currentStep === 2 && <OnboardingStep2 {...stepProps} />}
-              {currentStep === 3 && <OnboardingStep3 {...stepProps} />}
-              {currentStep === 4 && <OnboardingStep4 {...stepProps} />}
-              {currentStep === 5 && <OnboardingStep5 {...stepProps} />}
-              {currentStep === 6 && <OnboardingStep6 {...stepProps} />}
-
-              <div className="mt-8 flex gap-3 justify-between">
-                <Button
-                  variant="ghost"
-                  onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
-                  disabled={currentStep === 0}
-                >
-                  ← Back
-                </Button>
-
-                {isLastStep ? (
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    loading={generating}
-                    onClick={handleGenerateReport}
+                <AnimatePresence mode="wait" custom={direction.current}>
+                  <motion.div
+                    key={currentStep}
+                    custom={direction.current}
+                    variants={stepVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
                   >
-                    Generate My Strategy →
-                  </Button>
-                ) : (
+                    {currentStep === 0 && <OnboardingStep0 {...stepProps} />}
+                    {currentStep === 1 && <OnboardingStep1 {...stepProps} />}
+                    {currentStep === 2 && <OnboardingStep2 {...stepProps} />}
+                    {currentStep === 3 && <OnboardingStep3 {...stepProps} />}
+                    {currentStep === 4 && <OnboardingStep4 {...stepProps} />}
+                    {currentStep === 5 && <OnboardingStep5 {...stepProps} />}
+                    {currentStep === 6 && <OnboardingStep6 {...stepProps} />}
+                  </motion.div>
+                </AnimatePresence>
+
+                <div className="mt-8 flex gap-3 justify-between">
                   <Button
-                    variant="secondary"
-                    onClick={() => setCurrentStep((s) => Math.min(STEP_TITLES.length - 1, s + 1))}
+                    variant="ghost"
+                    onClick={() => goToStep(Math.max(0, currentStep - 1))}
+                    disabled={currentStep === 0}
                   >
-                    Next Step →
+                    ← Back
                   </Button>
-                )}
+
+                  {isLastStep ? (
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      loading={generating}
+                      onClick={handleGenerateReport}
+                      className={generating ? "pulse-glow" : ""}
+                    >
+                      Generate My Strategy →
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={() => goToStep(Math.min(STEP_TITLES.length - 1, currentStep + 1))}
+                    >
+                      Next Step →
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm p-4"
+            >
               <h3 className="font-semibold text-sm text-[#1F2A2A] mb-4">
                 Confidence Score
               </h3>
@@ -213,9 +258,14 @@ export default function OnboardingPage() {
                 <ConfidenceMeter label="ICP Confidence" value={confidence.icp} />
                 <ConfidenceMeter label="DMU Confidence" value={confidence.dmu} />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-[#1E6663]/5 rounded-xl border border-[#1E6663]/20 p-4">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.4 }}
+              className="bg-gradient-to-br from-[#1E6663]/8 to-[#1E6663]/4 rounded-xl border border-[#1E6663]/15 p-4"
+            >
               <h3 className="font-semibold text-sm text-[#1E6663] mb-2">
                 💡 Why this matters
               </h3>
@@ -223,9 +273,14 @@ export default function OnboardingPage() {
                 Scores below 90% generate a preliminary report with warnings.
                 Reach 90%+ on both to unlock lead ordering (strict gate).
               </p>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm p-4"
+            >
               <h3 className="font-semibold text-sm text-[#1F2A2A] mb-3">Steps</h3>
               <ul className="space-y-2">
                 {STEP_TITLES.map((title, i) => (
@@ -235,12 +290,14 @@ export default function OnboardingPage() {
                       i === currentStep
                         ? "text-[#1E6663] font-semibold"
                         : i < currentStep
-                        ? "text-gray-400 line-through"
+                        ? "text-gray-400"
                         : "text-gray-400"
                     }`}
                   >
-                    <span
-                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                    <motion.span
+                      animate={i === currentStep ? { scale: [1, 1.15, 1] } : {}}
+                      transition={{ duration: 0.3 }}
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
                         i < currentStep
                           ? "bg-green-100 text-green-600"
                           : i === currentStep
@@ -249,12 +306,12 @@ export default function OnboardingPage() {
                       }`}
                     >
                       {i < currentStep ? "✓" : i + 1}
-                    </span>
-                    {title}
+                    </motion.span>
+                    <span className={i < currentStep ? "line-through" : ""}>{title}</span>
                   </li>
                 ))}
               </ul>
-            </div>
+            </motion.div>
           </div>
         </div>
       </div>

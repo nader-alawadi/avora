@@ -2,6 +2,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { AvoraLogo } from "@/components/ui/AvoraLogo";
 
 interface Message {
   role: "user" | "assistant";
@@ -317,12 +319,8 @@ export default function ContactPage() {
       {/* Nav */}
       <nav className="border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#1a5c4a] rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">A</span>
-            </div>
-            <span className="font-bold text-lg text-[#1F2A2A]">AVORA</span>
-            <span className="text-xs text-gray-400 ml-1">by Enigma Sales</span>
+          <Link href="/">
+            <AvoraLogo size={32} showTagline />
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/" className="text-sm text-gray-500 hover:text-[#1a5c4a]">Home</Link>
@@ -360,11 +358,17 @@ export default function ContactPage() {
 
       {/* Contact Cards */}
       <section className="max-w-5xl mx-auto px-4 -mt-8 relative z-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
           {/* Aria Card */}
-          <button
+          <motion.button
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22,1,0.36,1] } } }}
             onClick={() => document.getElementById("chat-section")?.scrollIntoView({ behavior: "smooth" })}
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left hover:shadow-md hover:border-[#1a5c4a]/30 transition-all group"
+            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left hover:shadow-md hover:border-[#1a5c4a]/30 hover:-translate-y-1 transition-all group"
           >
             <div className="w-10 h-10 bg-[#1a5c4a]/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#1a5c4a]/20 transition-colors">
               <span className="text-[#1a5c4a] font-bold text-lg">A</span>
@@ -372,22 +376,26 @@ export default function ContactPage() {
             <h3 className="font-bold text-[#1F2A2A] text-sm">Aria — GTM Mentor</h3>
             <p className="text-gray-500 text-xs mt-1">AI-powered strategy coach. Build campaigns, find leads, get GTM advice.</p>
             <span className="mt-3 inline-flex items-center text-[#1a5c4a] text-xs font-semibold">Chat with Aria →</span>
-          </button>
+          </motion.button>
 
           {/* WhatsApp */}
-          <a href="https://wa.me/201011348217" target="_blank" rel="noopener noreferrer"
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left hover:shadow-md hover:border-green-300 transition-all group">
+          <motion.a
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22,1,0.36,1] } } }}
+            href="https://wa.me/201011348217" target="_blank" rel="noopener noreferrer"
+            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left hover:shadow-md hover:border-green-300 hover:-translate-y-1 transition-all group">
             <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-100 transition-colors">
               <WhatsAppIcon className="w-5 h-5 text-[#25D366]" />
             </div>
             <h3 className="font-bold text-[#1F2A2A] text-sm">WhatsApp</h3>
             <p className="text-gray-500 text-xs mt-1">Chat with our team. Fastest way to get a payment link or support.</p>
             <span className="mt-3 inline-flex items-center text-green-600 text-xs font-semibold">+20 101 134 8217 →</span>
-          </a>
+          </motion.a>
 
           {/* Email */}
-          <a href="mailto:growth@enigmasales.io"
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left hover:shadow-md hover:border-blue-200 transition-all group">
+          <motion.a
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22,1,0.36,1] } } }}
+            href="mailto:growth@enigmasales.io"
+            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left hover:shadow-md hover:border-blue-200 hover:-translate-y-1 transition-all group">
             <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
               <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -396,12 +404,13 @@ export default function ContactPage() {
             <h3 className="font-bold text-[#1F2A2A] text-sm">Email</h3>
             <p className="text-gray-500 text-xs mt-1">For inquiries, partnerships, or technical support.</p>
             <span className="mt-3 inline-flex items-center text-blue-600 text-xs font-semibold">growth@enigmasales.io →</span>
-          </a>
+          </motion.a>
 
           {/* Book a Call */}
-          <button
+          <motion.button
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22,1,0.36,1] } } }}
             onClick={() => document.getElementById("calendar-section")?.scrollIntoView({ behavior: "smooth" })}
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left hover:shadow-md hover:border-[#FF6B63]/30 transition-all group">
+            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left hover:shadow-md hover:border-[#FF6B63]/30 hover:-translate-y-1 transition-all group">
             <div className="w-10 h-10 bg-[#FF6B63]/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#FF6B63]/20 transition-colors">
               <svg className="w-5 h-5 text-[#FF6B63]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -410,8 +419,8 @@ export default function ContactPage() {
             <h3 className="font-bold text-[#1F2A2A] text-sm">Book a Call</h3>
             <p className="text-gray-500 text-xs mt-1">Schedule a 30-min strategy session with our GTM team.</p>
             <span className="mt-3 inline-flex items-center text-[#FF6B63] text-xs font-semibold">Pick a time →</span>
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
       </section>
 
       {/* Chat Section */}
@@ -450,47 +459,65 @@ export default function ContactPage() {
           <div className="h-[440px] overflow-y-auto p-4 space-y-4 bg-gray-50/60">
             {contextLoading ? (
               <div className="h-full flex items-center justify-center">
-                <div className="flex gap-1.5">
-                  <span className="w-2 h-2 bg-[#1a5c4a]/40 rounded-full animate-bounce [animation-delay:0ms]" />
-                  <span className="w-2 h-2 bg-[#1a5c4a]/40 rounded-full animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 bg-[#1a5c4a]/40 rounded-full animate-bounce [animation-delay:300ms]" />
+                <div className="flex gap-2">
+                  {[0, 150, 300].map((delay) => (
+                    <motion.span
+                      key={delay}
+                      className="w-2.5 h-2.5 bg-[#1a5c4a]/40 rounded-full"
+                      animate={{ y: [0, -8, 0] }}
+                      transition={{ duration: 0.8, repeat: Infinity, delay: delay / 1000 }}
+                    />
+                  ))}
                 </div>
               </div>
             ) : (
               <>
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    {msg.role === "assistant" && (
-                      <div className="w-8 h-8 bg-[#1a5c4a] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
-                        <span className="text-white text-xs font-bold">Ar</span>
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
-                        msg.role === "user"
-                          ? "bg-[#1a5c4a] text-white rounded-tr-sm"
-                          : "bg-white border border-gray-100 text-[#1F2A2A] rounded-tl-sm"
-                      }`}
+                <AnimatePresence initial={false}>
+                  {messages.map((msg, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                      className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                     >
-                      {msg.content === "" ? (
-                        <span className="flex gap-1 items-center py-0.5">
-                          <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0ms]" />
-                          <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:150ms]" />
-                          <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:300ms]" />
-                        </span>
-                      ) : (
-                        <MarkdownMessage content={msg.content} isUser={msg.role === "user"} />
+                      {msg.role === "assistant" && (
+                        <div className="w-8 h-8 bg-[#1a5c4a] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                          <span className="text-white text-xs font-bold">Ar</span>
+                        </div>
                       )}
-                    </div>
-                    {msg.role === "user" && (
-                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
+                          msg.role === "user"
+                            ? "bg-[#1a5c4a] text-white rounded-tr-sm"
+                            : "bg-white border border-gray-100 text-[#1F2A2A] rounded-tl-sm"
+                        }`}
+                      >
+                        {msg.content === "" ? (
+                          <span className="flex gap-1.5 items-center py-0.5">
+                            {[0, 150, 300].map((delay) => (
+                              <motion.span
+                                key={delay}
+                                className="w-1.5 h-1.5 bg-gray-300 rounded-full"
+                                animate={{ y: [0, -5, 0] }}
+                                transition={{ duration: 0.7, repeat: Infinity, delay: delay / 1000 }}
+                              />
+                            ))}
+                          </span>
+                        ) : (
+                          <MarkdownMessage content={msg.content} isUser={msg.role === "user"} />
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {msg.role === "user" && (
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
                 <div ref={messagesEndRef} />
               </>
             )}

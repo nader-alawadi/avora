@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 
 interface ConfidenceMeterProps {
   label: string;
@@ -7,14 +8,40 @@ interface ConfidenceMeterProps {
 }
 
 export function ConfidenceMeter({ label, value, size = "md" }: ConfidenceMeterProps) {
+  const [animatedWidth, setAnimatedWidth] = useState(0);
+  const [displayNum, setDisplayNum] = useState(0);
+
+  useEffect(() => {
+    const widthTimer = setTimeout(() => setAnimatedWidth(value), 80);
+    return () => clearTimeout(widthTimer);
+  }, [value]);
+
+  useEffect(() => {
+    let frame: number;
+    const start = performance.now();
+    const duration = 1100;
+
+    function tick(now: number) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayNum(Math.round(eased * value));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    }
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
   const color =
     value >= 90
-      ? "bg-green-500"
+      ? "from-green-400 to-green-500"
       : value >= 70
-      ? "bg-yellow-500"
+      ? "from-yellow-400 to-yellow-500"
       : value >= 50
-      ? "bg-orange-500"
-      : "bg-red-500";
+      ? "from-orange-400 to-orange-500"
+      : "from-red-400 to-red-500";
 
   const textColor =
     value >= 90
@@ -31,12 +58,16 @@ export function ConfidenceMeter({ label, value, size = "md" }: ConfidenceMeterPr
     <div className="space-y-1">
       <div className="flex justify-between items-center">
         <span className="text-sm font-medium text-gray-700">{label}</span>
-        <span className={`text-sm font-bold ${textColor}`}>{value}%</span>
+        <span className={`text-sm font-bold tabular-nums ${textColor}`}>
+          {displayNum}%
+        </span>
       </div>
-      <div className={`w-full bg-gray-200 rounded-full overflow-hidden ${heights[size]}`}>
+      <div
+        className={`w-full bg-gray-200 rounded-full overflow-hidden ${heights[size]}`}
+      >
         <div
-          className={`${heights[size]} ${color} rounded-full transition-all duration-500`}
-          style={{ width: `${value}%` }}
+          className={`${heights[size]} bg-gradient-to-r ${color} rounded-full transition-all duration-1000 ease-out`}
+          style={{ width: `${animatedWidth}%` }}
         />
       </div>
       {value < 90 && (
