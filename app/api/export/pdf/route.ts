@@ -5,8 +5,14 @@ import { createAuditLog } from "@/lib/audit";
 import { generateReportPdf } from "@/lib/pdf/generate-report-pdf";
 
 export async function POST(req: NextRequest) {
+  let session;
   try {
-    const session = await requireAuth();
+    session = await requireAuth();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
     const { reportId } = await req.json();
 
     // Check LITE export limit
@@ -72,7 +78,8 @@ export async function POST(req: NextRequest) {
         "Content-Disposition": `attachment; filename="avora-strategy-v${report.version}.pdf"`,
       },
     });
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (err) {
+    console.error("[PDF export error]", err);
+    return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 });
   }
 }
