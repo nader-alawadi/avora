@@ -608,7 +608,7 @@ export function LeadDeliveryPanel({ orders, onRefresh, adminRole }: Props) {
                                             disabled={!!sendingLeadId}
                                             className="text-xs px-3 py-1.5 rounded-lg bg-[#1E6663] text-white hover:bg-[#174f4d] transition-colors font-medium disabled:opacity-50 whitespace-nowrap"
                                           >
-                                            Send to {clientName} →
+                                            Send to Client →
                                           </button>
                                         </div>
                                       )}
