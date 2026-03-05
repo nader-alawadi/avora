@@ -9,14 +9,16 @@ interface Dispute {
   fileUrl?: string | null;
   status: string;
   adminNote?: string | null;
+  leadName?: string | null;
+  leadTitle?: string | null;
   createdAt: string;
   user: { id: string; name: string | null; email: string };
-  crmLead: {
+  crmLead?: {
     id: string;
     fullName?: string | null;
     roleTitle?: string | null;
     company?: string | null;
-  };
+  } | null;
 }
 
 function FilePreview({ url }: { url: string }) {
@@ -169,14 +171,14 @@ export function AdminDisputesTab() {
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-[#1F2A2A] text-sm">
-                        {dispute.crmLead.fullName || "Unnamed Lead"}
+                        {dispute.crmLead?.fullName || dispute.leadName || "Unnamed Lead"}
                       </p>
                       <Badge variant="warning">Pending</Badge>
                     </div>
-                    {dispute.crmLead.roleTitle && (
-                      <p className="text-xs text-gray-500">{dispute.crmLead.roleTitle}</p>
+                    {(dispute.crmLead?.roleTitle || dispute.leadTitle) && (
+                      <p className="text-xs text-gray-500">{dispute.crmLead?.roleTitle || dispute.leadTitle}</p>
                     )}
-                    {dispute.crmLead.company && (
+                    {dispute.crmLead?.company && (
                       <p className="text-xs text-[#1E6663] font-medium">{dispute.crmLead.company}</p>
                     )}
                   </div>
@@ -255,7 +257,7 @@ export function AdminDisputesTab() {
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium text-[#1F2A2A] text-sm">
-                      {dispute.crmLead.fullName || "Unnamed Lead"}
+                      {dispute.crmLead?.fullName || dispute.leadName || "Unnamed Lead"}
                     </p>
                     <Badge variant={STATUS_BADGE[dispute.status] || "default"}>
                       {dispute.status}

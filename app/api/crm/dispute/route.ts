@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
         details: details || null,
         fileUrl: fileUrl || null,
         status: "Pending",
+        leadName: lead.fullName || null,
+        leadTitle: lead.roleTitle || null,
       },
     });
 

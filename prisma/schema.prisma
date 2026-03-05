@@ -291,6 +291,8 @@ model LeadDispute {
   fileUrl   String?
   status    String   @default("Pending")  // "Pending" | "Accepted" | "Rejected"
   adminNote String?
+  leadName  String?  // snapshot of CrmLead.fullName at dispute creation time
+  leadTitle String?  // snapshot of CrmLead.roleTitle at dispute creation time
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
