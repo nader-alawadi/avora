@@ -49,6 +49,30 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const session = await requireAuth();
+    const { orderId } = await req.json();
+
+    if (!orderId) {
+      return NextResponse.json({ error: "Missing orderId" }, { status: 400 });
+    }
+
+    const order = await prisma.leadOrder.update({
+      where: { id: orderId, userId: session.id },
+      data: { status: "InvoiceCreated" },
+    });
+
+    await createAuditLog(session.id, "LEAD_ORDER_INVOICE_CREATED", "LeadOrder", order.id, {
+      orderId,
+    });
+
+    return NextResponse.json({ order });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
+
 export async function GET() {
   try {
     const session = await requireAuth();

@@ -70,12 +70,6 @@ export default function DashboardPage() {
       setLoading(false);
     });
 
-    // Auto-switch to the leads tab when returning from Stripe Checkout so the
-    // payment notice inside LeadsModule is visible immediately.
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("payment")) {
-      setActiveTab("leads");
-    }
   }, [router]);
 
   async function handleRegenerate() {
