@@ -37,6 +37,17 @@ const EMPTY_FORM: LeadFormData = {
   notes: "",
 };
 
+interface DisputedLead {
+  id: string;
+  status: "Disputed";
+  fullName?: string | null;
+  roleTitle?: string | null;
+  brandName?: string | null;
+  disputeReason?: string | null;
+  disputeDetails?: string | null;
+  disputeFileUrl?: string | null;
+}
+
 interface Order {
   id: string;
   leadCountMonthly: number;
@@ -46,7 +57,7 @@ interface Order {
   adminNotes?: string;
   createdAt: string;
   user: { name: string | null; email: string; companyProfile?: { companyName?: string | null } | null };
-  deliveredLeads: { id: string; status: string }[];
+  deliveredLeads: ({ id: string; status: string } | DisputedLead)[];
 }
 
 interface Props {
@@ -382,6 +393,7 @@ export function LeadDeliveryPanel({ orders, onRefresh, adminRole }: Props) {
           <div className="space-y-4">
             {activeOrders.map((order) => {
               const deliveredFromDb = order.deliveredLeads.filter((l) => l.status === "Delivered").length;
+              const disputedLeads = order.deliveredLeads.filter((l) => l.status === "Disputed") as DisputedLead[];
               const sessionSent = sentLeadIds[order.id]?.size ?? 0;
               const totalSent = deliveredFromDb + sessionSent;
               const staged = stagedLeads[order.id] || [];
@@ -451,9 +463,14 @@ export function LeadDeliveryPanel({ orders, onRefresh, adminRole }: Props) {
                       <span>Delivery progress</span>
                       <span className={totalSent >= order.leadCountMonthly ? "text-green-600 font-semibold" : ""}>
                         {totalSent} / {order.leadCountMonthly} leads sent
+                        {disputedLeads.length > 0 && (
+                          <span className="ml-2 text-orange-500 font-semibold">
+                            ({disputedLeads.length} replacement{disputedLeads.length !== 1 ? "s" : ""} needed)
+                          </span>
+                        )}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="w-full bg-gray-100 rounded-full h-2 relative overflow-hidden">
                       <div
                         className={`h-2 rounded-full transition-all duration-500 ${
                           totalSent >= order.leadCountMonthly
@@ -618,6 +635,79 @@ export function LeadDeliveryPanel({ orders, onRefresh, adminRole }: Props) {
                               })}
                             </tbody>
                           </table>
+                        </div>
+                      )}
+                      {/* Replacements Needed section */}
+                      {disputedLeads.length > 0 && (
+                        <div className="border-t border-orange-200 bg-orange-50/40">
+                          <div className="px-4 py-2.5 flex items-center gap-2 border-b border-orange-100">
+                            <span className="text-xs font-bold text-orange-600 uppercase tracking-wider">
+                              🔄 Replacements Needed ({disputedLeads.length})
+                            </span>
+                            <span className="text-xs text-orange-400">
+                              — these leads were disputed by the client
+                            </span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-orange-50 border-b border-orange-100">
+                                  <th className="text-left px-4 py-2 text-xs font-semibold text-orange-500 uppercase">#</th>
+                                  <th className="text-left px-4 py-2 text-xs font-semibold text-orange-500 uppercase">Lead</th>
+                                  <th className="text-left px-4 py-2 text-xs font-semibold text-orange-500 uppercase">Dispute Reason</th>
+                                  <th className="text-left px-4 py-2 text-xs font-semibold text-orange-500 uppercase">Proof</th>
+                                  <th className="text-left px-4 py-2 text-xs font-semibold text-orange-500 uppercase">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-orange-100">
+                                {disputedLeads.map((dl, idx) => (
+                                  <tr key={dl.id} className="bg-white hover:bg-orange-50/30">
+                                    <td className="px-4 py-2.5 text-xs text-gray-400">{idx + 1}</td>
+                                    <td className="px-4 py-2.5">
+                                      <p className="font-medium text-[#1F2A2A] text-xs whitespace-nowrap">
+                                        {dl.fullName || "—"}
+                                      </p>
+                                      {dl.roleTitle && (
+                                        <p className="text-[10px] text-gray-400 whitespace-nowrap">{dl.roleTitle}</p>
+                                      )}
+                                      {dl.brandName && (
+                                        <p className="text-[10px] text-[#1E6663] whitespace-nowrap">{dl.brandName}</p>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5">
+                                      <p className="text-xs font-semibold text-orange-600 whitespace-nowrap">
+                                        {dl.disputeReason || "—"}
+                                      </p>
+                                      {dl.disputeDetails && (
+                                        <p className="text-[10px] text-gray-500 max-w-[200px] truncate" title={dl.disputeDetails}>
+                                          {dl.disputeDetails}
+                                        </p>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5">
+                                      {dl.disputeFileUrl ? (
+                                        <a
+                                          href={dl.disputeFileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs text-[#1E6663] hover:underline whitespace-nowrap"
+                                        >
+                                          📎 View proof →
+                                        </a>
+                                      ) : (
+                                        <span className="text-xs text-gray-300">No attachment</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5">
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-600 border border-orange-200 whitespace-nowrap">
+                                        🔄 Replacement Needed
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       )}
                     </div>

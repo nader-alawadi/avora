@@ -16,7 +16,18 @@ export async function GET() {
           },
         },
         payments: true,
-        deliveredLeads: { select: { id: true, status: true } },
+        deliveredLeads: {
+          select: {
+            id: true,
+            status: true,
+            fullName: true,
+            roleTitle: true,
+            brandName: true,
+            disputeReason: true,
+            disputeDetails: true,
+            disputeFileUrl: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });

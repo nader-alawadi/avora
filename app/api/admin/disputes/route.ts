@@ -19,7 +19,7 @@ export async function GET() {
             roleTitle: true,
             company: true,
             deliveredLeadId: true,
-            deliveredLead: { select: { orderId: true } },
+            deliveredLead: { select: { id: true, orderId: true } },
           },
         },
       },
@@ -54,7 +54,8 @@ export async function PATCH(req: NextRequest) {
             id: true,
             userId: true,
             fullName: true,
-            deliveredLead: { select: { orderId: true } },
+            deliveredLeadId: true,
+            deliveredLead: { select: { id: true, orderId: true } },
           },
         },
       },
@@ -70,29 +71,38 @@ export async function PATCH(req: NextRequest) {
 
     if (action === "accept") {
       await prisma.$transaction(async (tx) => {
-        // Update dispute status
+        // 1. Mark the DeliveredLead as "Disputed" and stamp the dispute data onto it
+        //    so Lead Researchers can see exactly why it was rejected.
+        //    Do this BEFORE deleting the CrmLead (which would null out crmLead.deliveredLeadId).
+        const deliveredLeadId = dispute.crmLead?.deliveredLeadId ?? null;
+        if (deliveredLeadId) {
+          await tx.deliveredLead.update({
+            where: { id: deliveredLeadId },
+            data: {
+              status: "Disputed",
+              disputeReason: dispute.reason,
+              disputeDetails: dispute.details ?? null,
+              disputeFileUrl: dispute.fileUrl ?? null,
+            },
+          });
+        }
+
+        // 2. Delete the CRM lead (cascades to CrmActivity; LeadDispute.crmLeadId → SetNull)
+        if (dispute.crmLeadId) {
+          await tx.crmLead.delete({ where: { id: dispute.crmLeadId } });
+        }
+
+        // 3. Update dispute status
         await tx.leadDispute.update({
           where: { id: disputeId },
           data: { status: "Accepted", adminNote: adminNote || null, updatedAt: new Date() },
         });
-
-        // Delete the CRM lead
-        await tx.crmLead.delete({ where: { id: dispute.crmLeadId } });
-
-        // Decrement the order's delivered count by setting the DeliveredLead status back
-        // so it can be reassigned (replacement)
-        if (dispute.crmLead.deliveredLead?.orderId) {
-          await tx.deliveredLead.updateMany({
-            where: { orderId: dispute.crmLead.deliveredLead.orderId, status: "Delivered" },
-            data: {},  // no-op field update; actual count is derived
-          });
-        }
       });
 
       // Notify client via activity (lead is deleted, so we create a standalone audit log)
       await createAuditLog(session.id, "DISPUTE_ACCEPTED", "LeadDispute", disputeId, {
         crmLeadId: dispute.crmLeadId,
-        clientUserId: dispute.crmLead.userId,
+        clientUserId: dispute.crmLead?.userId,
         reason: dispute.reason,
         adminNote,
       });
@@ -106,18 +116,20 @@ export async function PATCH(req: NextRequest) {
       data: { status: "Rejected", adminNote: adminNote || null, updatedAt: new Date() },
     });
 
-    // Log activity on the lead so client sees it
-    await prisma.crmActivity.create({
-      data: {
-        crmLeadId: dispute.crmLeadId,
-        type: "dispute_rejected",
-        description: `Dispute rejected by admin${adminNote ? `: "${adminNote}"` : ""}`,
-      },
-    });
+    // Log activity on the lead so client sees it (only if CrmLead still exists)
+    if (dispute.crmLeadId) {
+      await prisma.crmActivity.create({
+        data: {
+          crmLeadId: dispute.crmLeadId,
+          type: "dispute_rejected",
+          description: `Dispute rejected by admin${adminNote ? `: "${adminNote}"` : ""}`,
+        },
+      });
+    }
 
     await createAuditLog(session.id, "DISPUTE_REJECTED", "LeadDispute", disputeId, {
       crmLeadId: dispute.crmLeadId,
-      clientUserId: dispute.crmLead.userId,
+      clientUserId: dispute.crmLead?.userId,
       reason: dispute.reason,
       adminNote,
     });

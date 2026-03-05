@@ -171,7 +171,10 @@ model DeliveredLead {
   whatsappAvailable      Boolean   @default(false)
   deliveryBatch          String?
   deliveryDate           DateTime?
-  status                 String    @default("Delivered")
+  status                 String    @default("Delivered") // "Staged" | "Delivered" | "Disputed"
+  disputeReason          String?
+  disputeDetails         String?
+  disputeFileUrl         String?
   createdAt              DateTime  @default(now())
 
   order   LeadOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -281,7 +284,7 @@ model AuditLog {
 
 model LeadDispute {
   id        String   @id @default(cuid())
-  crmLeadId String
+  crmLeadId String?              // nullable: set to null when CrmLead is deleted on accept
   userId    String
   reason    String
   details   String?
@@ -291,8 +294,8 @@ model LeadDispute {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  crmLead CrmLead @relation(fields: [crmLeadId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  crmLead CrmLead? @relation(fields: [crmLeadId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("lead_disputes")
 }
