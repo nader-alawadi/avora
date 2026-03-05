@@ -63,6 +63,9 @@ export async function POST(req: NextRequest) {
     if (!ADMIN_ROLES.includes(adminRole)) {
       return NextResponse.json({ error: `Invalid adminRole: ${adminRole}` }, { status: 400 });
     }
+    if (!email.toLowerCase().endsWith("@enigmasales.io")) {
+      return NextResponse.json({ error: "Admin team members must use an @enigmasales.io email address" }, { status: 400 });
+    }
 
     const existing = await prisma.adminTeamMember.findUnique({ where: { email } });
     if (existing) {
