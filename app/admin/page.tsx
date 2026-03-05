@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/Button";
 import { OrderRow } from "@/components/admin/OrderRow";
 import { LeadDeliveryPanel } from "@/components/admin/LeadDeliveryPanel";
 import { AdminTeamTab } from "@/components/admin/AdminTeamTab";
+import { AdminDisputesTab } from "@/components/admin/AdminDisputesTab";
 
 // Tabs visible per admin role
-const ALL_TABS = ["Users", "Payments", "Orders", "Deliver Leads", "Audit Log", "Team"];
+const ALL_TABS = ["Users", "Payments", "Orders", "Deliver Leads", "Disputes", "Audit Log", "Team"];
 
 const TABS_BY_ROLE: Record<string, string[]> = {
   SuperAdmin:     ALL_TABS,
-  AccountManager: ["Users", "Payments", "Orders", "Deliver Leads"],
+  AccountManager: ["Users", "Payments", "Orders", "Deliver Leads", "Disputes"],
   LeadResearcher: ["Deliver Leads"],
 };
 
@@ -85,6 +86,16 @@ export default function AdminPage() {
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
   const [updatingPayment, setUpdatingPayment] = useState<string | null>(null);
   const [grantingRegen, setGrantingRegen] = useState<string | null>(null);
+  const [pendingDisputeCount, setPendingDisputeCount] = useState(0);
+
+  const loadPendingDisputeCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/disputes");
+      const d = await res.json();
+      const count = (d.disputes || []).filter((x: { status: string }) => x.status === "Pending").length;
+      setPendingDisputeCount(count);
+    } catch { /* silent */ }
+  }, []);
 
   const checkAdmin = useCallback(async () => {
     const res = await fetch("/api/auth/me");
@@ -101,9 +112,20 @@ export default function AdminPage() {
     setActiveTab(tabs[0]);
     if (tabs[0] === "Users" || tabs.includes("Users")) loadUsers();
     if (tabs[0] === "Deliver Leads") loadOrders();
-  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Load dispute badge count for roles that can see Disputes
+    if (tabs.includes("Disputes")) loadPendingDisputeCount();
+  }, [router, loadPendingDisputeCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { checkAdmin(); }, [checkAdmin]);
+
+  // Poll dispute count every 60s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (visibleTabs.includes("Disputes")) loadPendingDisputeCount();
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [loadPendingDisputeCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleTabs = session?.adminRole
     ? (TABS_BY_ROLE[session.adminRole] ?? ALL_TABS)
@@ -141,6 +163,7 @@ export default function AdminPage() {
     if (tab === "Payments") loadPayments();
     if (tab === "Orders" || tab === "Deliver Leads") loadOrders();
     if (tab === "Audit Log") loadAuditLogs();
+    if (tab === "Disputes") loadPendingDisputeCount();
   }
 
   async function grantRegenCredit(userId: string) {
@@ -229,24 +252,32 @@ export default function AdminPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-gray-200 mb-6">
+        <div className="flex gap-1 border-b border-gray-200 mb-6 flex-wrap">
           {visibleTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => handleTabChange(tab)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              className={`relative px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab
                   ? "border-[#1E6663] text-[#1E6663]"
                   : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
               {tab}
+              {tab === "Disputes" && pendingDisputeCount > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-orange-500 text-white rounded-full">
+                  {pendingDisputeCount > 9 ? "9+" : pendingDisputeCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
         {/* Team Tab */}
         {activeTab === "Team" && <AdminTeamTab />}
+
+        {/* Disputes Tab */}
+        {activeTab === "Disputes" && <AdminDisputesTab />}
 
         {/* Users Tab */}
         {activeTab === "Users" && (

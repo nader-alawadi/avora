@@ -12,6 +12,11 @@ export async function GET() {
       where: { userId: session.id },
       include: {
         activities: { orderBy: { createdAt: "asc" } },
+        disputes: {
+          where: { status: "Pending" },
+          select: { id: true, status: true },
+          take: 1,
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -97,10 +102,17 @@ export async function PATCH(req: NextRequest) {
       return updatedLead;
     });
 
-    // Re-fetch with latest activities
+    // Re-fetch with latest activities and dispute status
     const finalLead = await prisma.crmLead.findUnique({
       where: { id },
-      include: { activities: { orderBy: { createdAt: "asc" } } },
+      include: {
+        activities: { orderBy: { createdAt: "asc" } },
+        disputes: {
+          where: { status: "Pending" },
+          select: { id: true, status: true },
+          take: 1,
+        },
+      },
     });
 
     return NextResponse.json({ lead: finalLead ?? updated });

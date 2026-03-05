@@ -31,6 +31,7 @@ model User {
   auditLogs         AuditLog[]
   crmLeads          CrmLead[]
   teamMembers       TeamMember[]
+  leadDisputes      LeadDispute[]
 
   @@map("users")
 }
@@ -206,6 +207,7 @@ model CrmLead {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveredLead DeliveredLead? @relation(fields: [deliveredLeadId], references: [id])
   activities    CrmActivity[]
+  disputes      LeadDispute[]
 
   @@map("crm_leads")
 }
@@ -275,4 +277,22 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
+}
+
+model LeadDispute {
+  id        String   @id @default(cuid())
+  crmLeadId String
+  userId    String
+  reason    String
+  details   String?
+  fileUrl   String?
+  status    String   @default("Pending")  // "Pending" | "Accepted" | "Rejected"
+  adminNote String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  crmLead CrmLead @relation(fields: [crmLeadId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("lead_disputes")
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -33,6 +33,7 @@ interface CrmLead {
   nextFollowUp?: string;
   createdAt: string;
   activities: CrmActivity[];
+  disputes?: { id: string; status: string }[];
 }
 
 // ── Stages ───────────────────────────────────────────────
@@ -47,29 +48,230 @@ const STAGES = [
   { id: "Lost",        label: "Lost",           color: "#dc2626", bg: "bg-red-600",     light: "bg-red-50        border-red-200" },
 ];
 
+const DISPUTE_REASONS = [
+  "Not the right person",
+  "Wrong company",
+  "Already a client",
+  "Fake/invalid contact",
+  "Other",
+];
+
+// ── Dispute Modal ─────────────────────────────────────────
+
+function DisputeModal({
+  lead,
+  onClose,
+  onSubmitted,
+}: {
+  lead: CrmLead;
+  onClose: () => void;
+  onSubmitted: (leadId: string) => void;
+}) {
+  const [reason, setReason] = useState(DISPUTE_REASONS[0]);
+  const [details, setDetails] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleSubmit() {
+    setError("");
+    setSubmitting(true);
+
+    try {
+      let fileUrl: string | null = null;
+
+      // Upload file if provided
+      if (file) {
+        if (file.size > 10 * 1024 * 1024) {
+          setError("File must be under 10MB");
+          setSubmitting(false);
+          return;
+        }
+        const fd = new FormData();
+        fd.append("file", file);
+        const uploadRes = await fetch("/api/upload/dispute", { method: "POST", body: fd });
+        if (!uploadRes.ok) {
+          const d = await uploadRes.json();
+          setError(d.error || "File upload failed");
+          setSubmitting(false);
+          return;
+        }
+        const uploadData = await uploadRes.json();
+        fileUrl = uploadData.fileUrl;
+      }
+
+      const res = await fetch("/api/crm/dispute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ crmLeadId: lead.id, reason, details: details.trim() || null, fileUrl }),
+      });
+
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "Failed to submit dispute");
+        return;
+      }
+
+      onSubmitted(lead.id);
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-bold text-[#1F2A2A] text-base">Dispute Lead</h3>
+            <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">
+              {lead.fullName || "Unnamed Lead"}{lead.company ? ` · ${lead.company}` : ""}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          {/* Reason */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+              Reason
+            </label>
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/30 focus:border-orange-400"
+            >
+              {DISPUTE_REASONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Details */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+              Details <span className="normal-case font-normal text-gray-400">(optional)</span>
+            </label>
+            <textarea
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              rows={3}
+              placeholder="Provide any additional context..."
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/30 focus:border-orange-400 resize-none"
+            />
+          </div>
+
+          {/* File upload */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+              Attachment <span className="normal-case font-normal text-gray-400">(screenshot, video, or voice note · max 10MB)</span>
+            </label>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50/30 transition-colors"
+            >
+              {file ? (
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-700">
+                  <span>📎</span>
+                  <span className="truncate max-w-xs">{file.name}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                    className="text-gray-400 hover:text-red-500 ml-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">Click to upload a file</p>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*,audio/*,.pdf"
+              className="hidden"
+              onChange={(e) => { if (e.target.files?.[0]) setFile(e.target.files[0]); }}
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2 bg-gray-50 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-medium rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-4 py-2 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors disabled:opacity-50"
+          >
+            {submitting ? "Submitting…" : "Submit Dispute"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Lead Card ────────────────────────────────────────────
 
 function LeadCard({
   lead,
   index,
   onClick,
+  onDispute,
+  readOnly,
 }: {
   lead: CrmLead;
   index: number;
   onClick: () => void;
+  onDispute: (e: React.MouseEvent) => void;
+  readOnly: boolean;
 }) {
+  const isDisputed = (lead.disputes?.length ?? 0) > 0;
+
   return (
-    <Draggable draggableId={lead.id} index={index}>
+    <Draggable draggableId={lead.id} index={index} isDragDisabled={isDisputed || readOnly}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={onClick}
-          className={`bg-white rounded-xl border border-gray-100 p-3.5 cursor-pointer select-none transition-shadow ${
-            snapshot.isDragging ? "shadow-xl rotate-1 scale-[1.02]" : "shadow-sm hover:shadow-md"
+          className={`bg-white rounded-xl border p-3.5 cursor-pointer select-none transition-shadow ${
+            isDisputed
+              ? "border-orange-300 shadow-sm opacity-80"
+              : snapshot.isDragging
+              ? "border-gray-100 shadow-xl rotate-1 scale-[1.02]"
+              : "border-gray-100 shadow-sm hover:shadow-md"
           }`}
         >
+          {/* Disputed badge */}
+          {isDisputed && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full border border-orange-200">
+                Disputed ⚠
+              </span>
+            </div>
+          )}
+
           <p className="font-semibold text-[#1F2A2A] text-sm truncate leading-snug">
             {lead.fullName || "Unnamed Lead"}
           </p>
@@ -103,6 +305,16 @@ function LeadCard({
               </span>
             )}
           </div>
+
+          {/* Dispute button — only shown when not already disputed and not readOnly */}
+          {!isDisputed && !readOnly && (
+            <button
+              onClick={onDispute}
+              className="mt-2.5 text-[10px] font-semibold text-orange-500 hover:text-orange-700 hover:underline transition-colors"
+            >
+              Dispute Lead
+            </button>
+          )}
         </div>
       )}
     </Draggable>
@@ -163,7 +375,11 @@ function LeadDrawer({
     stage_change: "↗️",
     note_updated: "📝",
     follow_up_set: "📅",
+    dispute_submitted: "⚠️",
+    dispute_rejected: "❌",
   };
+
+  const isDisputed = (lead.disputes?.length ?? 0) > 0;
 
   return (
     <motion.div
@@ -176,9 +392,16 @@ function LeadDrawer({
       {/* Header */}
       <div className="flex items-start justify-between p-5 border-b border-gray-100">
         <div className="flex-1 min-w-0">
-          <h2 className="font-bold text-[#1F2A2A] text-base truncate">
-            {lead.fullName || "Unnamed Lead"}
-          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-bold text-[#1F2A2A] text-base truncate">
+              {lead.fullName || "Unnamed Lead"}
+            </h2>
+            {isDisputed && (
+              <span className="text-[10px] font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full border border-orange-200 flex-shrink-0">
+                Disputed ⚠
+              </span>
+            )}
+          </div>
           {lead.roleTitle && <p className="text-sm text-gray-500 mt-0.5 truncate">{lead.roleTitle}</p>}
           {lead.company && <p className="text-sm text-[#1E6663] font-medium mt-0.5">{lead.company}</p>}
         </div>
@@ -248,9 +471,9 @@ function LeadDrawer({
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Stage</h3>
           <select
             value={stage}
-            disabled={readOnly}
+            disabled={readOnly || isDisputed}
             onChange={(e) => {
-              if (readOnly) return;
+              if (readOnly || isDisputed) return;
               setStage(e.target.value);
               save({ stage: e.target.value });
             }}
@@ -262,6 +485,9 @@ function LeadDrawer({
               </option>
             ))}
           </select>
+          {isDisputed && (
+            <p className="text-[10px] text-orange-500 mt-1">Stage locked while dispute is pending.</p>
+          )}
         </section>
 
         {/* Follow-up date */}
@@ -272,9 +498,9 @@ function LeadDrawer({
           <input
             type="date"
             value={followUp}
-            disabled={readOnly}
-            onChange={(e) => { if (!readOnly) setFollowUp(e.target.value); }}
-            onBlur={() => { if (!readOnly) save({ nextFollowUp: followUp }); }}
+            disabled={readOnly || isDisputed}
+            onChange={(e) => { if (!readOnly && !isDisputed) setFollowUp(e.target.value); }}
+            onBlur={() => { if (!readOnly && !isDisputed) save({ nextFollowUp: followUp }); }}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663] disabled:opacity-60 disabled:cursor-not-allowed"
           />
         </section>
@@ -284,13 +510,13 @@ function LeadDrawer({
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Notes</h3>
           <textarea
             value={notes}
-            readOnly={readOnly}
-            onChange={(e) => { if (!readOnly) setNotes(e.target.value); }}
+            readOnly={readOnly || isDisputed}
+            onChange={(e) => { if (!readOnly && !isDisputed) setNotes(e.target.value); }}
             rows={4}
-            placeholder={readOnly ? "No notes" : "Add notes about this lead..."}
+            placeholder={readOnly || isDisputed ? "No notes" : "Add notes about this lead..."}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663] resize-none disabled:opacity-60"
           />
-          {!readOnly && (
+          {!readOnly && !isDisputed && (
             <button
               onClick={() => save({ notes })}
               disabled={saving || notes === (lead.notes || "")}
@@ -299,7 +525,11 @@ function LeadDrawer({
               {saving ? "Saving…" : "Save Notes"}
             </button>
           )}
-          {readOnly && <p className="text-[10px] text-gray-400 mt-1">Read-only access</p>}
+          {(readOnly || isDisputed) && (
+            <p className="text-[10px] text-gray-400 mt-1">
+              {isDisputed ? "Locked while dispute is pending." : "Read-only access"}
+            </p>
+          )}
         </section>
 
         {/* Activity log */}
@@ -340,6 +570,7 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
   );
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<CrmLead | null>(null);
+  const [disputingLead, setDisputingLead] = useState<CrmLead | null>(null);
 
   const fetchLeads = useCallback(() => {
     fetch("/api/crm")
@@ -374,6 +605,11 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
+    // Don't allow dragging disputed leads
+    const allLeads = Object.values(columns).flat();
+    const movedLead = allLeads.find((l) => l.id === draggableId);
+    if (movedLead && (movedLead.disputes?.length ?? 0) > 0) return;
+
     const srcStage = source.droppableId;
     const dstStage = destination.droppableId;
 
@@ -402,7 +638,6 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
         .then((r) => r.json())
         .then((d) => {
           if (d.lead) {
-            // Update the lead with fresh activities
             setColumns((prev) => {
               const updated = { ...prev };
               for (const stage of Object.keys(updated)) {
@@ -412,7 +647,6 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
               }
               return updated;
             });
-            // Update drawer if open
             setSelectedLead((prev) => (prev?.id === d.lead.id ? d.lead : prev));
           }
         })
@@ -431,6 +665,27 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
       next[updated.stage] = [updated, ...next[updated.stage]];
       return next;
     });
+  }
+
+  function handleDisputeSubmitted(leadId: string) {
+    // Mark lead as disputed locally (pending re-fetch)
+    setColumns((prev) => {
+      const next: Record<string, CrmLead[]> = {};
+      for (const [stageId, leads] of Object.entries(prev)) {
+        next[stageId] = leads.map((l) =>
+          l.id === leadId
+            ? { ...l, disputes: [{ id: "pending", status: "Pending" }] }
+            : l
+        );
+      }
+      return next;
+    });
+    // Also update drawer if open
+    setSelectedLead((prev) =>
+      prev?.id === leadId
+        ? { ...prev, disputes: [{ id: "pending", status: "Pending" }] }
+        : prev
+    );
   }
 
   const totalLeads = Object.values(columns).reduce((s, l) => s + l.length, 0);
@@ -465,6 +720,15 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
 
   return (
     <>
+      {/* Dispute modal */}
+      {disputingLead && (
+        <DisputeModal
+          lead={disputingLead}
+          onClose={() => setDisputingLead(null)}
+          onSubmitted={handleDisputeSubmitted}
+        />
+      )}
+
       {/* Overlay for drawer */}
       <AnimatePresence>
         {selectedLead && (
@@ -563,6 +827,11 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
                             lead={lead}
                             index={index}
                             onClick={() => setSelectedLead(lead)}
+                            onDispute={(e) => {
+                              e.stopPropagation();
+                              setDisputingLead(lead);
+                            }}
+                            readOnly={readOnly}
                           />
                         ))}
                         {provided.placeholder}
