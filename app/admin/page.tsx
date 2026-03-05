@@ -5,8 +5,9 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { OrderRow } from "@/components/admin/OrderRow";
+import { LeadDeliveryPanel } from "@/components/admin/LeadDeliveryPanel";
 
-const TABS = ["Users", "Payments", "Orders", "Upload Leads", "Audit Log"];
+const TABS = ["Users", "Payments", "Orders", "Deliver Leads", "Audit Log"];
 
 interface User {
   id: string;
@@ -64,11 +65,6 @@ export default function AdminPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Upload leads state
-  const [selectedOrderId, setSelectedOrderId] = useState("");
-  const [leadsJson, setLeadsJson] = useState("");
-  const [uploading, setUploading] = useState(false);
-
   // Order update state
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
   const [updatingPayment, setUpdatingPayment] = useState<string | null>(null);
@@ -116,7 +112,7 @@ export default function AdminPage() {
   function handleTabChange(tab: string) {
     setActiveTab(tab);
     if (tab === "Payments") loadPayments();
-    if (tab === "Orders" || tab === "Upload Leads") loadOrders();
+    if (tab === "Orders" || tab === "Deliver Leads") loadOrders();
     if (tab === "Audit Log") loadAuditLogs();
   }
 
@@ -167,39 +163,6 @@ export default function AdminPage() {
       await loadOrders();
     } finally {
       setUpdatingOrder(null);
-    }
-  }
-
-  async function uploadLeads() {
-    if (!selectedOrderId || !leadsJson) {
-      alert("Select an order and paste leads JSON");
-      return;
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(leadsJson);
-    } catch {
-      alert("Invalid JSON format");
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const res = await fetch("/api/admin/leads/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: selectedOrderId, leads: parsed }),
-      });
-      const d = await res.json();
-      if (res.ok) {
-        alert(`✅ Uploaded ${d.count} leads! Batch: ${d.deliveryBatch}`);
-        setLeadsJson("");
-      } else {
-        alert(d.error);
-      }
-    } finally {
-      setUploading(false);
     }
   }
 
@@ -455,77 +418,9 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Upload Leads Tab */}
-        {activeTab === "Upload Leads" && (
-          <div className="max-w-2xl">
-            <h2 className="font-bold text-[#1F2A2A] mb-4">Upload Delivered Leads</h2>
-            <Card>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#1F2A2A] mb-1">
-                    Select Order
-                  </label>
-                  <select
-                    value={selectedOrderId}
-                    onChange={(e) => setSelectedOrderId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Choose order...</option>
-                    {orders
-                      .filter((o) =>
-                        ["PaidConfirmed", "InProgress"].includes(o.status)
-                      )
-                      .map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.user.email} — {o.leadCountMonthly} leads ($
-                          {o.totalPriceUsd})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#1F2A2A] mb-1">
-                    Leads JSON Array
-                  </label>
-                  <textarea
-                    value={leadsJson}
-                    onChange={(e) => setLeadsJson(e.target.value)}
-                    rows={10}
-                    placeholder={`[
-  {
-    "fullName": "...",
-    "roleTitle": "VP Sales",
-    "email": "...",
-    "phone": "...",
-    "linkedinUrl": "...",
-    "personalityType": "...",
-    "personalityAnalysisUrl": "...",
-    "brandName": "...",
-    "country": "...",
-    "techStacks": "...",
-    "seniorityLevel": "Senior",
-    "buyingRole": "Champion",
-    "preferredChannel": "LinkedIn",
-    "isPrimaryContact": true,
-    "whatsappAvailable": false
-  }
-]`}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono"
-                  />
-                </div>
-
-                <Button
-                  variant="primary"
-                  loading={uploading}
-                  onClick={uploadLeads}
-                  className="w-full"
-                >
-                  Upload Leads to Order
-                </Button>
-              </div>
-            </Card>
-          </div>
+        {/* Deliver Leads Tab */}
+        {activeTab === "Deliver Leads" && (
+          <LeadDeliveryPanel orders={orders} onRefresh={loadOrders} />
         )}
 
         {/* Audit Log Tab */}

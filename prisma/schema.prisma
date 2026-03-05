@@ -29,6 +29,7 @@ model User {
   payments          Payment[]
   exportPacks       ExportPack[]
   auditLogs         AuditLog[]
+  crmLeads          CrmLead[]
 
   @@map("users")
 }
@@ -171,9 +172,53 @@ model DeliveredLead {
   status                 String    @default("Delivered")
   createdAt              DateTime  @default(now())
 
-  order LeadOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   LeadOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  crmLead CrmLead?
 
   @@map("delivered_leads")
+}
+
+model CrmLead {
+  id                     String       @id @default(cuid())
+  userId                 String
+  deliveredLeadId        String?      @unique
+  fullName               String?
+  roleTitle              String?
+  company                String?
+  linkedinUrl            String?
+  email                  String?
+  phone                  String?
+  personalityType        String?
+  personalityAnalysisUrl String?
+  buyingRole             String?
+  preferredChannel       String?
+  seniorityLevel         String?
+  country                String?
+  techStacks             String?
+  whatsappAvailable      Boolean      @default(false)
+  stage                  String       @default("NewLead")
+  notes                  String?
+  nextFollowUp           DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveredLead DeliveredLead? @relation(fields: [deliveredLeadId], references: [id])
+  activities    CrmActivity[]
+
+  @@map("crm_leads")
+}
+
+model CrmActivity {
+  id          String   @id @default(cuid())
+  crmLeadId   String
+  type        String
+  description String
+  createdAt   DateTime @default(now())
+
+  crmLead CrmLead @relation(fields: [crmLeadId], references: [id], onDelete: Cascade)
+
+  @@map("crm_activities")
 }
 
 model AuditLog {

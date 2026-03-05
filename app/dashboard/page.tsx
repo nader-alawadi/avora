@@ -16,6 +16,8 @@ import { OutreachTab } from "@/components/dashboard/OutreachTab";
 import { LookalikeTab } from "@/components/dashboard/LookalikeTab";
 import { LeadsModule } from "@/components/dashboard/LeadsModule";
 import { PdfExportButton } from "@/components/dashboard/PdfExportButton";
+import { ProgressTab } from "@/components/dashboard/ProgressTab";
+import { CrmTab } from "@/components/dashboard/CrmTab";
 
 interface User {
   id: string;
@@ -49,6 +51,8 @@ const TABS = [
   { id: "outreach", label: "Outreach Playbook", icon: "📨" },
   { id: "lookalike", label: "Lookalike Criteria", icon: "🔍" },
   { id: "leads", label: "Request Leads", icon: "📊" },
+  { id: "progress", label: "Progress", icon: "📈" },
+  { id: "crm", label: "My CRM", icon: "👥" },
 ];
 
 export default function DashboardPage() {
@@ -330,6 +334,8 @@ export default function DashboardPage() {
                 {activeTab === "leads" && (
                   <LeadsModule report={report} user={user!} />
                 )}
+                {activeTab === "progress" && <ProgressTab />}
+                {activeTab === "crm" && <CrmTab />}
               </motion.div>
             </AnimatePresence>
           </>
