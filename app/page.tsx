@@ -55,6 +55,12 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <Link
+              href="/contact"
+              className="text-sm text-gray-600 hover:text-[#1E6663] font-medium transition-colors"
+            >
+              Contact Us
+            </Link>
+            <Link
               href="/login"
               className="text-sm text-gray-600 hover:text-[#1E6663] font-medium transition-colors"
             >

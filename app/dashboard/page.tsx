@@ -139,6 +139,9 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              <Link href="/contact" className="text-sm text-gray-500 hover:text-[#1E6663]">
+                Contact Us
+              </Link>
               <Link href="/onboarding" className="text-sm text-gray-500 hover:text-[#1E6663]">
                 Edit Onboarding
               </Link>
