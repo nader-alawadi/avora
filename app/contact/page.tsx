@@ -43,11 +43,22 @@ function renderInline(text: string): React.ReactNode[] {
   });
 }
 
+function isTableRow(line: string) {
+  return line.trim().startsWith("|") && line.trim().endsWith("|");
+}
+function isTableSeparator(line: string) {
+  return isTableRow(line) && /^\|[\s|:-]+\|$/.test(line.trim());
+}
+function parseTableCells(line: string): string[] {
+  return line.trim().slice(1, -1).split("|").map((c) => c.trim());
+}
+
 function MarkdownMessage({ content, isUser }: { content: string; isUser: boolean }) {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
   let bulletBuffer: string[] = [];
   let orderedBuffer: string[] = [];
+  let tableBuffer: string[] = [];
   let key = 0;
 
   const flushBullets = () => {
@@ -74,10 +85,53 @@ function MarkdownMessage({ content, isUser }: { content: string; isUser: boolean
       orderedBuffer = [];
     }
   };
-  const flush = () => { flushBullets(); flushOrdered(); };
+  const flushTable = () => {
+    if (tableBuffer.length < 2) {
+      // Not enough for a real table — render as plain text
+      tableBuffer.forEach((l) => elements.push(<p key={key++} className="leading-relaxed">{renderInline(l)}</p>));
+      tableBuffer = [];
+      return;
+    }
+    const rows = tableBuffer.filter((l) => !isTableSeparator(l));
+    const headerCells = parseTableCells(rows[0]);
+    const bodyRows = rows.slice(1);
+    elements.push(
+      <div key={key++} className="overflow-x-auto my-2 rounded-lg border border-gray-200">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-[#1a5c4a]">
+              {headerCells.map((cell, ci) => (
+                <th key={ci} className="text-white font-semibold px-3 py-2 text-left whitespace-nowrap">{renderInline(cell)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {bodyRows.map((row, ri) => (
+              <tr key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                {parseTableCells(row).map((cell, ci) => (
+                  <td key={ci} className="px-3 py-2 border-t border-gray-100 text-[#1F2A2A]">{renderInline(cell)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+    tableBuffer = [];
+  };
+  const flush = () => { flushBullets(); flushOrdered(); flushTable(); };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+
+    if (isTableRow(line)) {
+      flushBullets();
+      flushOrdered();
+      tableBuffer.push(line);
+      continue;
+    } else if (tableBuffer.length > 0) {
+      flushTable();
+    }
 
     if (/^### /.test(line)) {
       flush();
