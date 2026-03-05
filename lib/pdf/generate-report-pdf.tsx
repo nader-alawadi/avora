@@ -38,6 +38,35 @@ Font.register({
 // Disable hyphenation for Arabic text
 Font.registerHyphenationCallback((word) => [word]);
 
+/**
+ * Sanitize text before passing to react-pdf/textkit.
+ *
+ * textkit's bidi reorderLine crashes with "Cannot read properties of
+ * undefined (reading 'id')" when it encounters a character whose Unicode
+ * bidi category is not in its lookup table. This happens with:
+ *   - Unicode directional/format control characters (U+200B–U+200F,
+ *     U+202A–U+202E, U+2066–U+2069, U+FEFF …)
+ *   - Characters in supplementary planes (code point > U+FFFF), e.g.
+ *     emoji, which are outside textkit's BMP-only bidi tables.
+ *
+ * Stripping these invisible characters is safe: they carry no visible
+ * content, and basic Arabic text (U+0600–U+06FF) is fully supported.
+ */
+function sanitizeText(text: string | undefined | null): string {
+  if (!text) return "";
+  return (
+    text
+      // Remove Unicode directional and invisible format controls
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "")
+      // Remove supplementary-plane characters (code points > U+FFFF)
+      // These appear as surrogate pairs in JS strings
+      .replace(/[\uD800-\uDFFF]/g, "")
+      // Collapse any resulting double spaces / blank lines
+      .replace(/  +/g, " ")
+      .trim()
+  );
+}
+
 interface ReportData {
   icp: { summary?: string } | null;
   dmu: { summary?: string } | null;
@@ -183,7 +212,7 @@ function CoverPage({ report, styles }: { report: ReportData; styles: ReturnType<
       </Text>
 
       {meta.map((line, i) => (
-        <Text key={i} style={styles.metaLine}>{line}</Text>
+        <Text key={i} style={styles.metaLine}>{sanitizeText(line)}</Text>
       ))}
 
       <View style={styles.coverFooter}>
@@ -208,8 +237,8 @@ function SectionPage({
 }) {
   return (
     <Page size="A4" style={styles.page}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {summary && <Text style={styles.bodyText}>{summary}</Text>}
+      <Text style={styles.sectionTitle}>{sanitizeText(title)}</Text>
+      {summary && <Text style={styles.bodyText}>{sanitizeText(summary)}</Text>}
     </Page>
   );
 }
