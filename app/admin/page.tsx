@@ -58,7 +58,7 @@ interface Order {
   status: string;
   adminNotes?: string;
   createdAt: string;
-  user: { name: string | null; email: string };
+  user: { name: string | null; email: string; companyProfile?: { companyName?: string | null } | null };
   deliveredLeads: { id: string; status: string }[];
 }
 

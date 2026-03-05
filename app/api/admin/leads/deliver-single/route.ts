@@ -12,67 +12,79 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  console.log("[deliver-single] actor:", admin.sessionType, admin.adminRole ?? "n/a", admin.id);
+  console.log("[deliver-single] actor:", admin.sessionType, admin.adminRole ?? "n/a", "id:", admin.id);
 
   try {
-    const { leadId, orderId } = await req.json();
+    const body = await req.json();
+    const { leadId, orderId } = body as { leadId: string; orderId: string };
+    console.log("[deliver-single] leadId:", leadId, "orderId:", orderId);
+
     if (!leadId || !orderId) {
       return NextResponse.json({ error: "leadId and orderId are required" }, { status: 400 });
     }
 
+    // 1. Fetch order — we need order.userId to create CrmLead for the correct client
     const order = await prisma.leadOrder.findUnique({ where: { id: orderId } });
     if (!order) {
+      console.error("[deliver-single] order not found:", orderId);
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+    console.log("[deliver-single] order.userId:", order.userId, "order.status:", order.status);
 
+    // 2. Fetch the DeliveredLead — must be Staged and belong to this order
     const dl = await prisma.deliveredLead.findUnique({ where: { id: leadId } });
     if (!dl || dl.orderId !== orderId) {
+      console.error("[deliver-single] lead not found or wrong order. dl:", dl?.id, "dl.orderId:", dl?.orderId, "expected:", orderId);
       return NextResponse.json({ error: "Lead not found in this order" }, { status: 404 });
     }
     if (dl.status !== "Staged") {
+      console.warn("[deliver-single] lead already delivered. status:", dl.status);
       return NextResponse.json({ error: "Lead is not staged" }, { status: 409 });
     }
+    console.log("[deliver-single] DeliveredLead ok. fullName:", dl.fullName, "email:", dl.email);
 
-    // Check for existing CrmLead (idempotent guard)
+    // 3. Guard against double-submission
     const existing = await prisma.crmLead.findUnique({
       where: { deliveredLeadId: dl.id },
       select: { id: true },
     });
-
-    let crmLeadId: string;
-
     if (existing) {
-      crmLeadId = existing.id;
-    } else {
-      const crmLead = await prisma.crmLead.create({
-        data: {
-          userId: order.userId,
-          deliveredLeadId: dl.id,
-          fullName: dl.fullName || "",
-          roleTitle: dl.roleTitle || "",
-          company: dl.brandName || "",
-          linkedinUrl: dl.linkedinUrl || "",
-          email: dl.email || "",
-          phone: dl.phone || "",
-          personalityType: dl.personalityType || "",
-          buyingRole: dl.buyingRole || "",
-          seniorityLevel: dl.seniorityLevel || "",
-          country: dl.country || "",
-          stage: "NewLead",
-        },
-      });
-      crmLeadId = crmLead.id;
-
-      await prisma.crmActivity.create({
-        data: {
-          crmLeadId,
-          type: "lead_created",
-          description: "Lead added to CRM by AVORA team",
-        },
-      });
+      console.log("[deliver-single] CrmLead already exists:", existing.id, "— idempotent return");
+      return NextResponse.json({ crmLeadId: existing.id, ok: true });
     }
 
-    // Mark DeliveredLead as Delivered
+    // 4. Create CrmLead for the client (always uses order.userId, not admin's id)
+    console.log("[deliver-single] creating CrmLead for userId:", order.userId);
+    const crmLead = await prisma.crmLead.create({
+      data: {
+        userId: order.userId,
+        deliveredLeadId: dl.id,
+        fullName: dl.fullName || "",
+        roleTitle: dl.roleTitle || "",
+        company: dl.brandName || "",
+        linkedinUrl: dl.linkedinUrl || "",
+        email: dl.email || "",
+        phone: dl.phone || "",
+        personalityType: dl.personalityType || "",
+        buyingRole: dl.buyingRole || "",
+        seniorityLevel: dl.seniorityLevel || "",
+        country: dl.country || "",
+        stage: "NewLead",
+      },
+    });
+    console.log("[deliver-single] CrmLead created:", crmLead.id, "userId:", crmLead.userId);
+
+    // 5. Activity log
+    await prisma.crmActivity.create({
+      data: {
+        crmLeadId: crmLead.id,
+        type: "lead_created",
+        description: "Lead added to CRM by AVORA team",
+      },
+    });
+    console.log("[deliver-single] CrmActivity created for crmLeadId:", crmLead.id);
+
+    // 6. Mark DeliveredLead as Delivered
     await prisma.deliveredLead.update({
       where: { id: dl.id },
       data: {
@@ -81,28 +93,32 @@ export async function POST(req: NextRequest) {
         deliveryDate: new Date(),
       },
     });
+    console.log("[deliver-single] DeliveredLead marked Delivered:", dl.id);
 
-    // Update order to InProgress if it's still PaidConfirmed
+    // 7. Advance order from PaidConfirmed → InProgress on first send
     if (order.status === "PaidConfirmed") {
       await prisma.leadOrder.update({
         where: { id: orderId },
         data: { status: "InProgress" },
       });
+      console.log("[deliver-single] order advanced to InProgress");
     }
 
+    // 8. Audit log — pass null userId for AdminTeamMember sessions (FK safety)
     const auditUserId = admin.sessionType === "user" ? admin.id : null;
     await createAuditLog(auditUserId, "LEAD_DELIVERED_SINGLE", "DeliveredLead", dl.id, {
       orderId,
-      crmLeadId,
+      crmLeadId: crmLead.id,
+      clientUserId: order.userId,
       actorType: admin.sessionType,
       actorId: admin.id,
       actorEmail: admin.email,
     });
 
-    console.log("[deliver-single] done. crmLeadId:", crmLeadId);
-    return NextResponse.json({ crmLeadId, ok: true });
+    console.log("[deliver-single] done ✓ crmLeadId:", crmLead.id);
+    return NextResponse.json({ crmLeadId: crmLead.id, ok: true });
   } catch (err) {
-    console.error("[deliver-single] error:", err);
+    console.error("[deliver-single] UNHANDLED ERROR:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Internal server error" },
       { status: 500 }

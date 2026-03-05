@@ -45,7 +45,7 @@ interface Order {
   status: string;
   adminNotes?: string;
   createdAt: string;
-  user: { name: string | null; email: string };
+  user: { name: string | null; email: string; companyProfile?: { companyName?: string | null } | null };
   deliveredLeads: { id: string; status: string }[];
 }
 
@@ -388,7 +388,10 @@ export function LeadDeliveryPanel({ orders, onRefresh, adminRole }: Props) {
               const unseenStaged = staged.filter((l) => !(sentLeadIds[order.id]?.has(l.id)));
               const isExpanded = expandedOrder === order.id;
               const isLoading = fetchingStaged === order.id;
-              const clientName = order.user.name || order.user.email;
+              const clientName =
+                order.user.companyProfile?.companyName ||
+                order.user.name ||
+                order.user.email;
               const progressPct = Math.min(100, (totalSent / order.leadCountMonthly) * 100);
 
               return (

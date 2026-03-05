@@ -9,7 +9,12 @@ export async function GET() {
 
     const orders = await prisma.leadOrder.findMany({
       include: {
-        user: { select: { id: true, name: true, email: true, plan: true } },
+        user: {
+          select: {
+            id: true, name: true, email: true, plan: true,
+            companyProfile: { select: { companyName: true } },
+          },
+        },
         payments: true,
         deliveredLeads: { select: { id: true, status: true } },
       },
@@ -45,7 +50,11 @@ export async function PATCH(req: NextRequest) {
       data: { status, adminNotes },
     });
 
-    await createAuditLog(admin.id, "ORDER_STATUS_UPDATED", "LeadOrder", orderId, {
+    const auditUserId = admin.sessionType === "user" ? admin.id : null;
+    await createAuditLog(auditUserId, "ORDER_STATUS_UPDATED", "LeadOrder", orderId, {
+      actorType: admin.sessionType,
+      actorId: admin.id,
+      actorEmail: admin.email,
       status,
       adminNotes,
     });
