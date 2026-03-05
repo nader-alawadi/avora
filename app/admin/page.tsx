@@ -357,7 +357,7 @@ export default function AdminPage() {
 
         {/* Deliver Leads Tab */}
         {activeTab === "Deliver Leads" && (
-          <LeadDeliveryPanel orders={orders} onRefresh={loadOrders} />
+          <LeadDeliveryPanel orders={orders} onRefresh={loadOrders} adminRole={session?.adminRole} />
         )}
 
         {/* Audit Log Tab */}
