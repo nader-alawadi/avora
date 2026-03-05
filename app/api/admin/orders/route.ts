@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireAuth } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit";
 
 export async function GET() {
+  // GET is open to all admin roles, including LeadResearcher who needs to
+  // see orders in the Deliver Leads tab.
+  let session;
   try {
-    await requireAdmin();
+    session = await requireAuth();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  if (!session.isAdmin && session.sessionType !== "adminTeam") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
     const orders = await prisma.leadOrder.findMany({
       include: {
         user: {
@@ -40,14 +51,20 @@ export async function GET() {
     }));
 
     return NextResponse.json({ orders: annotated });
-  } catch {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  } catch (err) {
+    console.error("[admin/orders GET] error:", err);
+    return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
     const admin = await requireAdmin();
+
+    // LeadResearcher can read orders but cannot modify them
+    if (admin.sessionType === "adminTeam" && admin.adminRole === "LeadResearcher") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { orderId, status, adminNotes } = await req.json();
 
     const validStatuses = [
