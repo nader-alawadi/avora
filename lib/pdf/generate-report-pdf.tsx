@@ -13,12 +13,17 @@ import {
 // crash textkit's bidi algorithm. Helvetica is the built-in react-pdf
 // Latin font — no custom font registration needed.
 
+interface ReportSection {
+  summary?: string;
+  englishSummary?: string;
+}
+
 interface ReportData {
-  icp: { summary?: string } | null;
-  dmu: { summary?: string } | null;
-  abm: { summary?: string } | null;
-  outreach: { summary?: string } | null;
-  lookalike: { summary?: string } | null;
+  icp: ReportSection | null;
+  dmu: ReportSection | null;
+  abm: ReportSection | null;
+  outreach: ReportSection | null;
+  lookalike: ReportSection | null;
   icpConfidence: number;
   dmuConfidence: number;
   strictPassed: boolean;
@@ -32,14 +37,21 @@ const CORAL = "#FF6B63";
 const DARK = "#1F2A2A";
 const WHITE = "#FFFFFF";
 
-// Strip any non-ASCII / non-Latin characters so textkit never receives
-// Arabic Unicode or bidi control characters.
-function toLatinSafe(text: string | undefined | null): string {
-  if (!text) return "";
-  return text
-    .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\u024F]/g, " ")
-    .replace(/  +/g, " ")
-    .trim();
+// Return the English summary for PDF rendering.
+// New reports include an explicit englishSummary field; for older reports
+// that only have the language-specific summary, strip non-Latin characters
+// as a safe fallback so textkit never receives Arabic Unicode.
+function pdfSummary(section: ReportSection | null | undefined): string {
+  if (!section) return "";
+  const text = section.englishSummary || section.summary || "";
+  if (!section.englishSummary) {
+    // Legacy fallback: strip characters outside Latin/ASCII range
+    return text
+      .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\u024F]/g, " ")
+      .replace(/  +/g, " ")
+      .trim();
+  }
+  return text;
 }
 
 const styles = StyleSheet.create({
@@ -153,13 +165,12 @@ function CoverPage({ report }: { report: ReportData }) {
   );
 }
 
-function SectionPage({ title, summary }: { title: string; summary?: string }) {
+function SectionPage({ title, section }: { title: string; section: ReportSection | null }) {
+  const text = pdfSummary(section);
   return (
     <Page size="A4" style={styles.page}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {summary && (
-        <Text style={styles.bodyText}>{toLatinSafe(summary)}</Text>
-      )}
+      {text && <Text style={styles.bodyText}>{text}</Text>}
     </Page>
   );
 }
@@ -196,7 +207,7 @@ function ReportDocument({ report }: { report: ReportData }) {
     <Document>
       <CoverPage report={report} />
       {sections.map(({ title, data }, i) => (
-        <SectionPage key={i} title={title} summary={data?.summary} />
+        <SectionPage key={i} title={title} section={data} />
       ))}
       <NextStepsPage />
     </Document>

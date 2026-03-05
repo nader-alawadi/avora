@@ -148,7 +148,8 @@ Generate the ICP (Ideal Customer Profile) section. Return this exact JSON struct
   "triggers": ["4-6 buying trigger events"],
   "qualifiers": ["5-7 must-have qualification criteria"],
   "disqualifiers": ["all disqualifiers from context"],
-  "summary": "2-3 sentence ICP summary",
+  "summary": "2-3 sentence ICP summary in the response language",
+  "englishSummary": "2-3 sentence ICP summary always written in English regardless of response language",
   "warnings": ["any data gaps if mode is balanced, empty array if strict"]
 }`;
 
@@ -201,7 +202,8 @@ Generate the DMU (Decision Making Unit) Map section. Return this exact JSON stru
   ],
   "buyingProcess": "2-3 sentence description of typical buying process",
   "keyObjections": ["4-6 common objections with brief response hints"],
-  "summary": "2-3 sentence DMU summary"
+  "summary": "2-3 sentence DMU summary in the response language",
+  "englishSummary": "2-3 sentence DMU summary always written in English regardless of response language"
 }`;
 
   const text = await callClaude(prompt);
@@ -236,7 +238,8 @@ Generate the ABM (Account-Based Marketing) Strategy section. Return this exact J
   ],
   "prioritizationFramework": "3-4 sentence framework for scoring and prioritizing accounts",
   "kpis": ["5-7 KPIs to track ABM performance"],
-  "summary": "2-3 sentence ABM strategy summary"
+  "summary": "2-3 sentence ABM strategy summary in the response language",
+  "englishSummary": "2-3 sentence ABM strategy summary always written in English regardless of response language"
 }`;
 
   const text = await callClaude(prompt);
@@ -293,7 +296,8 @@ Generate the Outreach Playbook section. Keep templates concise (2-3 sentences ea
     }
   ],
   "sequenceOverview": "2-3 sentence multi-channel sequence overview",
-  "summary": "2-3 sentence outreach strategy summary"
+  "summary": "2-3 sentence outreach strategy summary in the response language",
+  "englishSummary": "2-3 sentence outreach strategy summary always written in English regardless of response language"
 }`;
 
   const text = await callClaude(prompt);
@@ -329,7 +333,8 @@ Generate the Lookalike Company Criteria section. NO specific company names or pe
     "Boolean search string 1 for LinkedIn/Google",
     "Boolean search string 2"
   ],
-  "summary": "2-3 sentence lookalike strategy summary",
+  "summary": "2-3 sentence lookalike strategy summary in the response language",
+  "englishSummary": "2-3 sentence lookalike strategy summary always written in English regardless of response language",
   "disclaimer": "These are search criteria only. No specific companies or personal contacts are provided. Use these criteria to build your own targeted account lists."
 }`;
 
