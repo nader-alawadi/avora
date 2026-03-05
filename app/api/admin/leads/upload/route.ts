@@ -71,10 +71,19 @@ export async function POST(req: NextRequest) {
 
     const deliveryBatch = `Batch-${Date.now()}`;
     const deliveryDate = new Date();
+    const deliveredByAdminId =
+      admin.sessionType === "adminTeam" && admin.adminTeamMemberId
+        ? admin.adminTeamMemberId
+        : null;
 
     await prisma.deliveredLead.updateMany({
       where: { orderId, status: "Staged" },
-      data: { status: "Delivered", deliveryBatch, deliveryDate },
+      data: {
+        status: "Delivered",
+        deliveryBatch,
+        deliveryDate,
+        ...(deliveredByAdminId && { deliveredByAdminId }),
+      },
     });
 
     // Create CrmLead entries

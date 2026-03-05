@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { EmployeeDashboard } from "@/components/employee/EmployeeDashboard";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { AvoraLogo } from "@/components/ui/AvoraLogo";
@@ -32,6 +33,8 @@ interface User {
   sessionType?: string;
   teamRole?: string;
   workspaceOwnerId?: string;
+  // adminTeam session fields
+  adminRole?: string;
 }
 
 interface Report {
@@ -103,6 +106,12 @@ export default function DashboardPage() {
       fetch("/api/reports/latest").then((r) => r.json()),
     ]).then(([userData, reportData]) => {
       if (userData.error) { router.push("/login"); return; }
+      // AdminTeamMembers use /dashboard as their employee HR dashboard
+      if (userData.user?.sessionType === "adminTeam") {
+        setUser(userData.user);
+        setLoading(false);
+        return;
+      }
       setUser(userData.user);
       setReport(reportData.report);
 
@@ -172,6 +181,11 @@ export default function DashboardPage() {
         </div>
       </div>
     );
+  }
+
+  // AdminTeamMembers see their own HR/employee dashboard
+  if (user?.sessionType === "adminTeam") {
+    return <EmployeeDashboard memberName={user.name} memberRole={user.adminRole ?? null} />;
   }
 
   return (

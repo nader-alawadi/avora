@@ -8,9 +8,10 @@ import { OrderRow } from "@/components/admin/OrderRow";
 import { LeadDeliveryPanel } from "@/components/admin/LeadDeliveryPanel";
 import { AdminTeamTab } from "@/components/admin/AdminTeamTab";
 import { AdminDisputesTab } from "@/components/admin/AdminDisputesTab";
+import { AdminHRTab } from "@/components/admin/AdminHRTab";
 
 // Tabs visible per admin role
-const ALL_TABS = ["Users", "Payments", "Orders", "Deliver Leads", "Disputes", "Audit Log", "Team"];
+const ALL_TABS = ["Users", "Payments", "Orders", "Deliver Leads", "Disputes", "Audit Log", "Team", "HR"];
 
 const TABS_BY_ROLE: Record<string, string[]> = {
   SuperAdmin:     ALL_TABS,
@@ -275,6 +276,7 @@ export default function AdminPage() {
 
         {/* Team Tab */}
         {activeTab === "Team" && <AdminTeamTab />}
+        {activeTab === "HR" && <AdminHRTab />}
 
         {/* Disputes Tab */}
         {activeTab === "Disputes" && <AdminDisputesTab />}

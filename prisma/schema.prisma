@@ -177,6 +177,9 @@ model DeliveredLead {
   disputeFileUrl         String?
   createdAt              DateTime  @default(now())
 
+  deliveredByAdminId String?
+  deliveredByAdmin   AdminTeamMember? @relation("DeliveredByAdmin", fields: [deliveredByAdminId], references: [id], onDelete: SetNull)
+
   order   LeadOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   crmLead CrmLead?
 
@@ -241,8 +244,23 @@ model AdminTeamMember {
   inviteToken       String?   @unique
   inviteTokenExpiry DateTime?
   lastActive        DateTime?
+  // HR fields
+  jobTitle          String?
+  avatarUrl         String?
+  phone             String?
+  nationalId        String?
+  bankAccount       String?
+  eWallet           String?
+  baseSalary        Float?
+  dailyLeadTarget   Int       @default(10)
+  bonusBalance      Float     @default(0)       // cached; derived from deliveredLeads & withdrawals
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  attendanceLogs     AttendanceLog[]
+  bonusTransactions  BonusTransaction[]
+  withdrawalRequests WithdrawalRequest[]
+  deliveredLeads     DeliveredLead[]     @relation("DeliveredByAdmin")
 
   @@map("admin_team_members")
 }
@@ -300,4 +318,49 @@ model LeadDispute {
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("lead_disputes")
+}
+
+model AttendanceLog {
+  id                String    @id @default(cuid())
+  adminTeamMemberId String
+  date              String    // YYYY-MM-DD (UTC)
+  checkInTime       DateTime?
+  checkOutTime      DateTime?
+  hoursWorked       Float?
+  status            String    @default("Absent") // Present | Late | Absent
+  createdAt         DateTime  @default(now())
+
+  adminTeamMember AdminTeamMember @relation(fields: [adminTeamMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([adminTeamMemberId, date])
+  @@map("attendance_logs")
+}
+
+model BonusTransaction {
+  id                String   @id @default(cuid())
+  adminTeamMemberId String
+  type              String   // Qualified | Rejected | Withdrawal
+  amount            Float
+  leadId            String?
+  description       String?
+  createdAt         DateTime @default(now())
+
+  adminTeamMember AdminTeamMember @relation(fields: [adminTeamMemberId], references: [id], onDelete: Cascade)
+
+  @@map("bonus_transactions")
+}
+
+model WithdrawalRequest {
+  id                String   @id @default(cuid())
+  adminTeamMemberId String
+  amount            Float
+  accountDetails    String
+  status            String   @default("Pending") // Pending | Approved | Rejected
+  adminNote         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  adminTeamMember AdminTeamMember @relation(fields: [adminTeamMemberId], references: [id], onDelete: Cascade)
+
+  @@map("withdrawal_requests")
 }

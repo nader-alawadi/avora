@@ -84,13 +84,18 @@ export async function POST(req: NextRequest) {
     });
     console.log("[deliver-single] CrmActivity created for crmLeadId:", crmLead.id);
 
-    // 6. Mark DeliveredLead as Delivered
+    // 6. Mark DeliveredLead as Delivered; record who delivered it for HR bonus tracking
+    const deliveredByAdminId =
+      admin.sessionType === "adminTeam" && admin.adminTeamMemberId
+        ? admin.adminTeamMemberId
+        : null;
     await prisma.deliveredLead.update({
       where: { id: dl.id },
       data: {
         status: "Delivered",
         deliveryBatch: `Single-${Date.now()}`,
         deliveryDate: new Date(),
+        ...(deliveredByAdminId && { deliveredByAdminId }),
       },
     });
     console.log("[deliver-single] DeliveredLead marked Delivered:", dl.id);
