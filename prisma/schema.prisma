@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id              String    @id @default(cuid())
+  name            String?
+  email           String    @unique
+  password        String
+  plan            String    @default("LITE")
+  language        String    @default("en")
+  timezone        String    @default("UTC")
+  pdfExportsUsed  Int       @default(0)
+  isAdmin         Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  companyProfile    CompanyProfile?
+  onboardingAnswers OnboardingAnswer[]
+  generatedReports  GeneratedReport[]
+  leadOrders        LeadOrder[]
+  payments          Payment[]
+  exportPacks       ExportPack[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model CompanyProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  companyName     String?
+  websiteUrl      String?
+  industry        String?
+  geoTargets      String?
+  employeeRange   String?
+  revenueRange    String?
+  offer           String?
+  problem         String?
+  pricingRange    String?
+  salesCycleRange String?
+  toolsStack      String?
+  notes           String?
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+model OnboardingAnswer {
+  id        String   @id @default(cuid())
+  userId    String
+  step      Int
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, step, key])
+  @@map("onboarding_answers")
+}
+
+model GeneratedReport {
+  id             String   @id @default(cuid())
+  userId         String
+  language       String   @default("en")
+  icpJson        String?
+  dmuJson        String?
+  abmJson        String?
+  outreachJson   String?
+  lookalikeJson  String?
+  icpConfidence  Float    @default(0)
+  dmuConfidence  Float    @default(0)
+  strictPassed   Boolean  @default(false)
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadOrders LeadOrder[]
+
+  @@map("generated_reports")
+}
+
+model LeadOrder {
+  id                      String   @id @default(cuid())
+  userId                  String
+  reportId                String?
+  leadCountMonthly        Int
+  pricePerLead            Float
+  totalPriceUsd           Float
+  status                  String   @default("Draft")
+  deliverySlaBusinessDays Int      @default(7)
+  adminNotes              String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report         GeneratedReport?  @relation(fields: [reportId], references: [id])
+  payments       Payment[]
+  deliveredLeads DeliveredLead[]
+
+  @@map("lead_orders")
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  userId      String
+  orderId     String?
+  type        String
+  provider    String   @default("PAYONEER")
+  invoiceLink String?
+  reference   String?
+  status      String   @default("Pending")
+  amountUsd   Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order LeadOrder?  @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model ExportPack {
+  id        String   @id @default(cuid())
+  userId    String
+  credits   Int      @default(50)
+  priceUsd  Float    @default(100)
+  status    String   @default("Pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("export_packs")
+}
+
+model DeliveredLead {
+  id                     String    @id @default(cuid())
+  orderId                String
+  contactId              String?
+  fullName               String?
+  roleTitle              String?
+  linkedinUrl            String?
+  email                  String?
+  phone                  String?
+  personalityType        String?
+  personalityAnalysisUrl String?
+  companyId              String?
+  brandName              String?
+  notes                  String?
+  country                String?
+  techStacks             String?
+  seniorityLevel         String?
+  buyingRole             String?
+  preferredChannel       String?
+  isPrimaryContact       Boolean   @default(false)
+  whatsappAvailable      Boolean   @default(false)
+  deliveryBatch          String?
+  deliveryDate           DateTime?
+  status                 String    @default("Delivered")
+  createdAt              DateTime  @default(now())
+
+  order LeadOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("delivered_leads")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  details   String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
