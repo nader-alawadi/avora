@@ -9,20 +9,29 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import path from "path";
+import fs from "fs";
 
-// Register Amiri font for Arabic support
+// Register Amiri font for Arabic support.
+// Use base64 data URLs so react-pdf receives self-contained font data
+// instead of a local path string (which react-pdf tries to fetch as a
+// network URL, causing ENOENT on local paths).
 const amiriBase = path.join(
   process.cwd(),
   "node_modules/@fontsource/amiri/files"
 );
 
+function fontDataUrl(filename: string): string {
+  const buf = fs.readFileSync(path.join(amiriBase, filename));
+  return `data:font/woff;base64,${buf.toString("base64")}`;
+}
+
 Font.register({
   family: "Amiri",
   fonts: [
-    { src: path.join(amiriBase, "amiri-arabic-400-normal.woff"), fontWeight: 400 },
-    { src: path.join(amiriBase, "amiri-arabic-700-normal.woff"), fontWeight: 700 },
-    { src: path.join(amiriBase, "amiri-arabic-400-italic.woff"), fontWeight: 400, fontStyle: "italic" },
-    { src: path.join(amiriBase, "amiri-arabic-700-italic.woff"), fontWeight: 700, fontStyle: "italic" },
+    { src: fontDataUrl("amiri-arabic-400-normal.woff"), fontWeight: 400 },
+    { src: fontDataUrl("amiri-arabic-700-normal.woff"), fontWeight: 700 },
+    { src: fontDataUrl("amiri-arabic-400-italic.woff"), fontWeight: 400, fontStyle: "italic" },
+    { src: fontDataUrl("amiri-arabic-700-italic.woff"), fontWeight: 700, fontStyle: "italic" },
   ],
 });
 
