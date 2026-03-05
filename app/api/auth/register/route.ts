@@ -48,15 +48,7 @@ export async function POST(req: NextRequest) {
       data: { userId: user.id },
     });
 
-    const token = createToken({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      plan: user.plan,
-      isAdmin: user.isAdmin,
-      language: user.language,
-      pdfExportsUsed: user.pdfExportsUsed,
-    });
+    const token = createToken({ sessionType: "user", userId: user.id });
 
     const cookieStore = await cookies();
     cookieStore.set("avora-token", token, {

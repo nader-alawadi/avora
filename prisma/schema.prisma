@@ -30,6 +30,7 @@ model User {
   exportPacks       ExportPack[]
   auditLogs         AuditLog[]
   crmLeads          CrmLead[]
+  teamMembers       TeamMember[]
 
   @@map("users")
 }
@@ -219,6 +220,47 @@ model CrmActivity {
   crmLead CrmLead @relation(fields: [crmLeadId], references: [id], onDelete: Cascade)
 
   @@map("crm_activities")
+}
+
+// ── Team access models ────────────────────────────────────────
+
+// Internal Enigma Sales team members who work inside the Admin panel
+model AdminTeamMember {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
+  password          String?                     // null until invite accepted
+  adminRole         String                      // "SuperAdmin" | "AccountManager" | "LeadResearcher"
+  assignedClientIds String    @default("[]")    // JSON array of User.id values
+  status            String    @default("Pending") // "Pending" | "Active"
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
+  lastActive        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("admin_team_members")
+}
+
+// Sub-users inside a client's workspace (same business domain)
+model TeamMember {
+  id                String    @id @default(cuid())
+  workspaceOwnerId  String
+  email             String
+  name              String?
+  password          String?                     // null until invite accepted
+  role              String                      // "Admin" | "SalesRep" | "Viewer"
+  status            String    @default("Pending") // "Pending" | "Active" | "Revoked"
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
+  lastActive        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  workspaceOwner User @relation(fields: [workspaceOwnerId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceOwnerId, email])
+  @@map("team_members")
 }
 
 model AuditLog {

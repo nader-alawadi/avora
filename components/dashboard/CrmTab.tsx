@@ -115,10 +115,12 @@ function LeadDrawer({
   lead,
   onClose,
   onUpdate,
+  readOnly = false,
 }: {
   lead: CrmLead;
   onClose: () => void;
   onUpdate: (updated: CrmLead) => void;
+  readOnly?: boolean;
 }) {
   const [notes, setNotes] = useState(lead.notes || "");
   const [stage, setStage] = useState(lead.stage);
@@ -246,11 +248,13 @@ function LeadDrawer({
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Stage</h3>
           <select
             value={stage}
+            disabled={readOnly}
             onChange={(e) => {
+              if (readOnly) return;
               setStage(e.target.value);
               save({ stage: e.target.value });
             }}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663]"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {STAGES.map((s) => (
               <option key={s.id} value={s.id}>
@@ -268,11 +272,10 @@ function LeadDrawer({
           <input
             type="date"
             value={followUp}
-            onChange={(e) => {
-              setFollowUp(e.target.value);
-            }}
-            onBlur={() => save({ nextFollowUp: followUp })}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663]"
+            disabled={readOnly}
+            onChange={(e) => { if (!readOnly) setFollowUp(e.target.value); }}
+            onBlur={() => { if (!readOnly) save({ nextFollowUp: followUp }); }}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663] disabled:opacity-60 disabled:cursor-not-allowed"
           />
         </section>
 
@@ -281,18 +284,22 @@ function LeadDrawer({
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Notes</h3>
           <textarea
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            readOnly={readOnly}
+            onChange={(e) => { if (!readOnly) setNotes(e.target.value); }}
             rows={4}
-            placeholder="Add notes about this lead..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663] resize-none"
+            placeholder={readOnly ? "No notes" : "Add notes about this lead..."}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6663]/30 focus:border-[#1E6663] resize-none disabled:opacity-60"
           />
-          <button
-            onClick={() => save({ notes })}
-            disabled={saving || notes === (lead.notes || "")}
-            className="mt-2 text-xs font-semibold text-[#1E6663] hover:underline disabled:opacity-40 disabled:no-underline"
-          >
-            {saving ? "Saving…" : "Save Notes"}
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => save({ notes })}
+              disabled={saving || notes === (lead.notes || "")}
+              className="mt-2 text-xs font-semibold text-[#1E6663] hover:underline disabled:opacity-40 disabled:no-underline"
+            >
+              {saving ? "Saving…" : "Save Notes"}
+            </button>
+          )}
+          {readOnly && <p className="text-[10px] text-gray-400 mt-1">Read-only access</p>}
         </section>
 
         {/* Activity log */}
@@ -327,7 +334,7 @@ function LeadDrawer({
 
 // ── CRM Tab (main) ───────────────────────────────────────
 
-export function CrmTab() {
+export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
   const [columns, setColumns] = useState<Record<string, CrmLead[]>>(() =>
     Object.fromEntries(STAGES.map((s) => [s.id, []]))
   );
@@ -362,6 +369,7 @@ export function CrmTab() {
   }, [fetchLeads]);
 
   function onDragEnd(result: DropResult) {
+    if (readOnly) return; // Viewer: no drag
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
@@ -472,6 +480,7 @@ export function CrmTab() {
               lead={selectedLead}
               onClose={() => setSelectedLead(null)}
               onUpdate={handleLeadUpdate}
+              readOnly={readOnly}
             />
           </>
         )}

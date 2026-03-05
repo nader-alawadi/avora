@@ -6,8 +6,24 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { OrderRow } from "@/components/admin/OrderRow";
 import { LeadDeliveryPanel } from "@/components/admin/LeadDeliveryPanel";
+import { AdminTeamTab } from "@/components/admin/AdminTeamTab";
 
-const TABS = ["Users", "Payments", "Orders", "Deliver Leads", "Audit Log"];
+// Tabs visible per admin role
+const ALL_TABS = ["Users", "Payments", "Orders", "Deliver Leads", "Audit Log", "Team"];
+
+const TABS_BY_ROLE: Record<string, string[]> = {
+  SuperAdmin:     ALL_TABS,
+  AccountManager: ["Users", "Payments", "Orders", "Deliver Leads"],
+  LeadResearcher: ["Deliver Leads"],
+};
+
+interface SessionUser {
+  isAdmin: boolean;
+  sessionType: string;
+  adminRole?: string;
+  email: string;
+  name?: string;
+}
 
 interface User {
   id: string;
@@ -43,7 +59,7 @@ interface Order {
   adminNotes?: string;
   createdAt: string;
   user: { name: string | null; email: string };
-  deliveredLeads: { id: string }[];
+  deliveredLeads: { id: string; status: string }[];
 }
 
 interface AuditLog {
@@ -58,14 +74,14 @@ interface AuditLog {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("Users");
+  const [session, setSession] = useState<SessionUser | null>(null);
+  const [activeTab, setActiveTab] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Order update state
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
   const [updatingPayment, setUpdatingPayment] = useState<string | null>(null);
   const [grantingRegen, setGrantingRegen] = useState<string | null>(null);
@@ -75,13 +91,23 @@ export default function AdminPage() {
     const data = await res.json();
     if (!data.user?.isAdmin) {
       router.push("/dashboard");
+      return;
     }
-  }, [router]);
+    setSession(data.user);
 
-  useEffect(() => {
-    checkAdmin();
-    loadUsers();
-  }, [checkAdmin]);
+    // Determine first visible tab for this role
+    const role = data.user.adminRole || "SuperAdmin";
+    const tabs = TABS_BY_ROLE[role] ?? ALL_TABS;
+    setActiveTab(tabs[0]);
+    if (tabs[0] === "Users" || tabs.includes("Users")) loadUsers();
+    if (tabs[0] === "Deliver Leads") loadOrders();
+  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { checkAdmin(); }, [checkAdmin]);
+
+  const visibleTabs = session?.adminRole
+    ? (TABS_BY_ROLE[session.adminRole] ?? ALL_TABS)
+    : ALL_TABS;
 
   async function loadUsers() {
     setLoading(true);
@@ -111,6 +137,7 @@ export default function AdminPage() {
 
   function handleTabChange(tab: string) {
     setActiveTab(tab);
+    if (tab === "Users") loadUsers();
     if (tab === "Payments") loadPayments();
     if (tab === "Orders" || tab === "Deliver Leads") loadOrders();
     if (tab === "Audit Log") loadAuditLogs();
@@ -124,11 +151,8 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, credits: 1 }),
       });
-      if (res.ok) {
-        await loadUsers();
-      } else {
-        alert("Failed to grant credit");
-      }
+      if (res.ok) await loadUsers();
+      else alert("Failed to grant credit");
     } finally {
       setGrantingRegen(null);
     }
@@ -148,11 +172,7 @@ export default function AdminPage() {
     }
   }
 
-  async function updateOrderStatus(
-    orderId: string,
-    status: string,
-    adminNotes: string
-  ) {
+  async function updateOrderStatus(orderId: string, status: string, adminNotes: string) {
     setUpdatingOrder(orderId);
     try {
       await fetch("/api/admin/orders", {
@@ -167,15 +187,15 @@ export default function AdminPage() {
   }
 
   const STATUS_BADGE: Record<string, "default" | "warning" | "success" | "danger" | "info"> = {
-    Pending: "warning",
-    Confirmed: "success",
-    Rejected: "danger",
-    Draft: "default",
-    InvoiceCreated: "warning",
-    AwaitingConfirmation: "warning",
-    PaidConfirmed: "info",
-    InProgress: "info",
-    Delivered: "success",
+    Pending: "warning", Confirmed: "success", Rejected: "danger",
+    Draft: "default", InvoiceCreated: "warning", AwaitingConfirmation: "warning",
+    PaidConfirmed: "info", InProgress: "info", Delivered: "success",
+  };
+
+  const ROLE_LABELS: Record<string, string> = {
+    SuperAdmin: "Super Admin",
+    AccountManager: "Account Manager",
+    LeadResearcher: "Lead Researcher",
   };
 
   return (
@@ -185,10 +205,16 @@ export default function AdminPage() {
           <h1 className="font-bold text-xl">AVORA Admin</h1>
           <p className="text-white/70 text-xs">Enigma Sales Internal Panel</p>
         </div>
-        <div className="flex gap-3">
-          <a href="/dashboard" className="text-white/80 hover:text-white text-sm">
-            ← Dashboard
-          </a>
+        <div className="flex items-center gap-4">
+          {session && (
+            <div className="text-right">
+              <p className="text-white/90 text-xs font-medium">{session.name || session.email}</p>
+              {session.adminRole && (
+                <p className="text-white/50 text-[10px]">{ROLE_LABELS[session.adminRole] || session.adminRole}</p>
+              )}
+            </div>
+          )}
+          <a href="/dashboard" className="text-white/80 hover:text-white text-sm">← Dashboard</a>
           <button
             onClick={async () => {
               await fetch("/api/auth/logout", { method: "POST" });
@@ -204,7 +230,7 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Tabs */}
         <div className="flex gap-1 border-b border-gray-200 mb-6">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => handleTabChange(tab)}
@@ -219,95 +245,49 @@ export default function AdminPage() {
           ))}
         </div>
 
+        {/* Team Tab */}
+        {activeTab === "Team" && <AdminTeamTab />}
+
         {/* Users Tab */}
         {activeTab === "Users" && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-[#1F2A2A]">
-                Users ({users.length})
-              </h2>
-              <Button size="sm" variant="ghost" onClick={loadUsers}>
-                Refresh
-              </Button>
+              <h2 className="font-bold text-[#1F2A2A]">Users ({users.length})</h2>
+              <Button size="sm" variant="ghost" onClick={loadUsers}>Refresh</Button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full bg-white rounded-xl border border-gray-200 text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                      User
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                      Plan
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                      PDF Exports
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                      Regen Credits
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                      Orders
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                      Reports
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                      Joined
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                      Actions
-                    </th>
+                    {["User", "Plan", "PDF Exports", "Regen Credits", "Orders", "Reports", "Joined", "Actions"].map((h) => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {users.map((u) => (
                     <tr key={u.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-[#1F2A2A]">
-                          {u.name || "—"}
-                        </p>
+                        <p className="font-medium text-[#1F2A2A]">{u.name || "—"}</p>
                         <p className="text-xs text-gray-400">{u.email}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge
-                          variant={u.plan === "PLUS" ? "success" : "default"}
-                        >
-                          {u.plan}
-                        </Badge>
+                        <Badge variant={u.plan === "PLUS" ? "success" : "default"}>{u.plan}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {u.pdfExportsUsed}/3
-                      </td>
+                      <td className="px-4 py-3 text-gray-600">{u.pdfExportsUsed}/3</td>
                       <td className="px-4 py-3">
                         <div className="text-xs text-gray-600 space-y-0.5">
-                          <p>
-                            Monthly: {u.monthlyRegenerateUsed} used
-                            {u.regenerateResetMonth ? ` (${u.regenerateResetMonth})` : ""}
-                          </p>
+                          <p>Monthly: {u.monthlyRegenerateUsed} used{u.regenerateResetMonth ? ` (${u.regenerateResetMonth})` : ""}</p>
                           {u.extraRegenerateCredits > 0 && (
-                            <p className="text-[#1E6663] font-medium">
-                              +{u.extraRegenerateCredits} extra
-                            </p>
+                            <p className="text-[#1E6663] font-medium">+{u.extraRegenerateCredits} extra</p>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {u._count.leadOrders}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {u._count.generatedReports}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs">
-                        {new Date(u.createdAt).toLocaleDateString()}
-                      </td>
+                      <td className="px-4 py-3 text-gray-600">{u._count.leadOrders}</td>
+                      <td className="px-4 py-3 text-gray-600">{u._count.generatedReports}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-3">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          loading={grantingRegen === u.id}
-                          onClick={() => grantRegenCredit(u.id)}
-                        >
+                        <Button size="sm" variant="ghost" loading={grantingRegen === u.id} onClick={() => grantRegenCredit(u.id)}>
                           +1 Regen
                         </Button>
                       </td>
@@ -322,9 +302,7 @@ export default function AdminPage() {
         {/* Payments Tab */}
         {activeTab === "Payments" && (
           <div>
-            <h2 className="font-bold text-[#1F2A2A] mb-4">
-              Payments ({payments.length})
-            </h2>
+            <h2 className="font-bold text-[#1F2A2A] mb-4">Payments ({payments.length})</h2>
             <div className="space-y-3">
               {payments.map((payment) => (
                 <Card key={payment.id} padding="sm">
@@ -334,64 +312,32 @@ export default function AdminPage() {
                         <span className="font-semibold text-[#1F2A2A] text-sm">
                           {payment.type} — ${payment.amountUsd}
                         </span>
-                        <Badge variant={STATUS_BADGE[payment.status] || "default"}>
-                          {payment.status}
-                        </Badge>
+                        <Badge variant={STATUS_BADGE[payment.status] || "default"}>{payment.status}</Badge>
                       </div>
                       <p className="text-xs text-gray-500">
-                        {payment.user.name || payment.user.email} ·{" "}
-                        {payment.provider}
+                        {payment.user.name || payment.user.email} · {payment.provider}
                       </p>
                       {payment.reference && (
-                        <p className="text-xs text-gray-400 font-mono mt-0.5">
-                          Ref: {payment.reference}
-                        </p>
+                        <p className="text-xs text-gray-400 font-mono mt-0.5">Ref: {payment.reference}</p>
                       )}
                       {payment.invoiceLink && (
-                        <a
-                          href={payment.invoiceLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-[#1E6663] hover:underline"
-                        >
-                          View Invoice →
-                        </a>
+                        <a href={payment.invoiceLink} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-[#1E6663] hover:underline">View Invoice →</a>
                       )}
-                      <p className="text-xs text-gray-400 mt-1">
-                        {new Date(payment.createdAt).toLocaleString()}
-                      </p>
+                      <p className="text-xs text-gray-400 mt-1">{new Date(payment.createdAt).toLocaleString()}</p>
                     </div>
-
                     {payment.status === "Pending" && (
                       <div className="flex flex-col gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          loading={updatingPayment === payment.id}
-                          onClick={() =>
-                            updatePaymentStatus(payment.id, "Confirmed")
-                          }
-                        >
-                          ✓ Confirm
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          loading={updatingPayment === payment.id}
-                          onClick={() =>
-                            updatePaymentStatus(payment.id, "Rejected")
-                          }
-                        >
-                          ✗ Reject
-                        </Button>
+                        <Button size="sm" variant="secondary" loading={updatingPayment === payment.id}
+                          onClick={() => updatePaymentStatus(payment.id, "Confirmed")}>✓ Confirm</Button>
+                        <Button size="sm" variant="danger" loading={updatingPayment === payment.id}
+                          onClick={() => updatePaymentStatus(payment.id, "Rejected")}>✗ Reject</Button>
                       </div>
                     )}
                   </div>
                 </Card>
               ))}
-              {payments.length === 0 && (
-                <p className="text-gray-400 text-center py-8">No payments yet</p>
-              )}
+              {payments.length === 0 && <p className="text-gray-400 text-center py-8">No payments yet</p>}
             </div>
           </div>
         )}
@@ -399,21 +345,12 @@ export default function AdminPage() {
         {/* Orders Tab */}
         {activeTab === "Orders" && (
           <div>
-            <h2 className="font-bold text-[#1F2A2A] mb-4">
-              Lead Orders ({orders.length})
-            </h2>
+            <h2 className="font-bold text-[#1F2A2A] mb-4">Lead Orders ({orders.length})</h2>
             <div className="space-y-3">
               {orders.map((order) => (
-                <OrderRow
-                  key={order.id}
-                  order={order}
-                  onUpdate={updateOrderStatus}
-                  updating={updatingOrder === order.id}
-                />
+                <OrderRow key={order.id} order={order} onUpdate={updateOrderStatus} updating={updatingOrder === order.id} />
               ))}
-              {orders.length === 0 && (
-                <p className="text-gray-400 text-center py-8">No orders yet</p>
-              )}
+              {orders.length === 0 && <p className="text-gray-400 text-center py-8">No orders yet</p>}
             </div>
           </div>
         )}
@@ -426,47 +363,28 @@ export default function AdminPage() {
         {/* Audit Log Tab */}
         {activeTab === "Audit Log" && (
           <div>
-            <h2 className="font-bold text-[#1F2A2A] mb-4">
-              Audit Log ({auditLogs.length} entries)
-            </h2>
+            <h2 className="font-bold text-[#1F2A2A] mb-4">Audit Log ({auditLogs.length} entries)</h2>
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-2 text-gray-500">Time</th>
-                      <th className="text-left px-4 py-2 text-gray-500">Action</th>
-                      <th className="text-left px-4 py-2 text-gray-500">User</th>
-                      <th className="text-left px-4 py-2 text-gray-500">Entity</th>
-                      <th className="text-left px-4 py-2 text-gray-500">Details</th>
+                      {["Time", "Action", "User", "Entity", "Details"].map((h) => (
+                        <th key={h} className="text-left px-4 py-2 text-gray-500">{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {auditLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
-                          {new Date(log.createdAt).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2 font-mono font-semibold text-[#1E6663]">
-                          {log.action}
-                        </td>
-                        <td className="px-4 py-2 text-gray-600">
-                          {log.user?.email || "—"}
-                        </td>
+                        <td className="px-4 py-2 text-gray-400 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
+                        <td className="px-4 py-2 font-mono font-semibold text-[#1E6663]">{log.action}</td>
+                        <td className="px-4 py-2 text-gray-600">{log.user?.email || "—"}</td>
                         <td className="px-4 py-2 text-gray-500">
-                          {log.entity && (
-                            <span>
-                              {log.entity}:{" "}
-                              <span className="font-mono text-xs">
-                                {log.entityId?.slice(0, 8)}...
-                              </span>
-                            </span>
-                          )}
+                          {log.entity && <span>{log.entity}: <span className="font-mono text-xs">{log.entityId?.slice(0, 8)}…</span></span>}
                         </td>
                         <td className="px-4 py-2 text-gray-400 max-w-xs truncate">
-                          {log.details
-                            ? JSON.stringify(JSON.parse(log.details))
-                            : "—"}
+                          {log.details ? JSON.stringify(JSON.parse(log.details)) : "—"}
                         </td>
                       </tr>
                     ))}

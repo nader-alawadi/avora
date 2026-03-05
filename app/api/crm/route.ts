@@ -29,6 +29,11 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   try {
     const session = await requireAuth();
+
+    // Viewers cannot mutate CRM data
+    if (session.sessionType === "teamMember" && session.teamRole === "Viewer") {
+      return NextResponse.json({ error: "Viewers have read-only access" }, { status: 403 });
+    }
     const { id, stage, notes, nextFollowUp } = await req.json();
 
     if (!id) {
