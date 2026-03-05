@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit";
+import { generateReportPdf } from "@/lib/pdf/generate-report-pdf";
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,19 +46,30 @@ export async function POST(req: NextRequest) {
 
     await createAuditLog(session.id, "PDF_EXPORTED", "GeneratedReport", reportId);
 
-    // Return report data for client-side PDF generation
-    return NextResponse.json({
-      reportData: {
-        icp: report.icpJson ? JSON.parse(report.icpJson) : null,
-        dmu: report.dmuJson ? JSON.parse(report.dmuJson) : null,
-        abm: report.abmJson ? JSON.parse(report.abmJson) : null,
-        outreach: report.outreachJson ? JSON.parse(report.outreachJson) : null,
-        lookalike: report.lookalikeJson ? JSON.parse(report.lookalikeJson) : null,
-        icpConfidence: report.icpConfidence,
-        dmuConfidence: report.dmuConfidence,
-        version: report.version,
-        createdAt: report.createdAt,
-        language: report.language,
+    // Generate PDF server-side with proper Arabic/RTL font support
+    const reportData = {
+      icp: report.icpJson ? JSON.parse(report.icpJson) : null,
+      dmu: report.dmuJson ? JSON.parse(report.dmuJson) : null,
+      abm: report.abmJson ? JSON.parse(report.abmJson) : null,
+      outreach: report.outreachJson ? JSON.parse(report.outreachJson) : null,
+      lookalike: report.lookalikeJson
+        ? JSON.parse(report.lookalikeJson)
+        : null,
+      icpConfidence: report.icpConfidence,
+      dmuConfidence: report.dmuConfidence,
+      strictPassed: report.strictPassed,
+      version: report.version,
+      createdAt: report.createdAt.toISOString(),
+      language: report.language,
+    };
+
+    const pdfBuffer = await generateReportPdf(reportData);
+
+    return new NextResponse(new Uint8Array(pdfBuffer), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="avora-strategy-v${report.version}.pdf"`,
       },
     });
   } catch {
