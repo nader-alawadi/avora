@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { KpiCard } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -50,9 +50,14 @@ const TABS = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [report, setReport] = useState<Report | null>(null);
-  const [activeTab, setActiveTab] = useState("icp");
+  const validTabs = TABS.map((t) => t.id);
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    tabParam && validTabs.includes(tabParam) ? tabParam : "icp"
+  );
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [showRegenModal, setShowRegenModal] = useState(false);
