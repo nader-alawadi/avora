@@ -112,7 +112,7 @@ export function LeadsModule({ report, user }: { report: Report; user: User }) {
 
     const { orderId, leadCount: count, totalPrice: price, packageName } = orderConfirmation;
     const message = `Hi, I'd like to request a payment link for my AVORA order: ${packageName} - ${count} leads/month - $${price} USD. Reference: ${orderId}`;
-    const waUrl = `https://wa.me/message/XNPPIXVAPDRNG1?text=${encodeURIComponent(message)}`;
+    const waUrl = `https://wa.me/201011348217?text=${encodeURIComponent(message)}`;
 
     window.open(waUrl, "_blank");
 
