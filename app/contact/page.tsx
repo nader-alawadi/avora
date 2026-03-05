@@ -31,7 +31,7 @@ interface UserContext {
 // ─── Markdown renderer ────────────────────────────────────────────────────────
 
 function renderInline(text: string): React.ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/);
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**"))
       return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
@@ -39,6 +39,9 @@ function renderInline(text: string): React.ReactNode[] {
       return <em key={i}>{part.slice(1, -1)}</em>;
     if (part.startsWith("`") && part.endsWith("`"))
       return <code key={i} className="bg-black/10 rounded px-1 text-xs font-mono">{part.slice(1, -1)}</code>;
+    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (linkMatch)
+      return <a key={i} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-[#1a5c4a] underline underline-offset-2 hover:text-[#0d3d30] font-medium">{linkMatch[1]}</a>;
     return part;
   });
 }
