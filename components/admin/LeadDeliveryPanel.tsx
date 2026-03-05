@@ -56,6 +56,7 @@ interface Order {
   status: string;
   adminNotes?: string;
   createdAt: string;
+  needsReplacement?: boolean;
   user: { name: string | null; email: string; companyProfile?: { companyName?: string | null } | null };
   deliveredLeads: ({ id: string; status: string } | DisputedLead)[];
 }
@@ -83,6 +84,12 @@ const STATUS_BADGE: Record<string, "default" | "warning" | "success" | "danger" 
 };
 
 const ACTIVE_STATUSES = ["PaidConfirmed", "InProgress"];
+
+// An order also surfaces in the "Ready for Delivery" section if it is
+// Delivered/InProgress but still has disputed leads awaiting replacement.
+function needsDeliveryAction(order: Order): boolean {
+  return ACTIVE_STATUSES.includes(order.status) || (order.needsReplacement ?? false);
+}
 const MAX_LEADS = 90;
 
 const SENIORITY_OPTIONS = ["Junior", "Mid", "Senior", "Director", "C-Level"];
@@ -371,8 +378,8 @@ export function LeadDeliveryPanel({ orders, onRefresh, adminRole }: Props) {
 
   // ── Render ────────────────────────────────────────────────
 
-  const activeOrders = orders.filter((o) => ACTIVE_STATUSES.includes(o.status));
-  const otherOrders = orders.filter((o) => !ACTIVE_STATUSES.includes(o.status));
+  const activeOrders = orders.filter(needsDeliveryAction);
+  const otherOrders = orders.filter((o) => !needsDeliveryAction(o));
 
   return (
     <div className="space-y-6">
@@ -416,9 +423,15 @@ export function LeadDeliveryPanel({ orders, onRefresh, adminRole }: Props) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-semibold text-[#1F2A2A] text-sm truncate">{clientName}</p>
-                        <Badge variant={STATUS_BADGE[order.status] || "default"}>
-                          {order.status}
-                        </Badge>
+                        {disputedLeads.length > 0 && !ACTIVE_STATUSES.includes(order.status) ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-600 border border-orange-200 whitespace-nowrap">
+                            🔄 Replacements Needed
+                          </span>
+                        ) : (
+                          <Badge variant={STATUS_BADGE[order.status] || "default"}>
+                            {order.status}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-gray-400 truncate">{order.user.email}</p>
                     </div>

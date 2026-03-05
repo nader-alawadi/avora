@@ -32,7 +32,14 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ orders });
+    // Annotate each order with a derived flag so the delivery panel can surface
+    // "Delivered" orders that still have disputed leads needing replacement.
+    const annotated = orders.map((o) => ({
+      ...o,
+      needsReplacement: o.deliveredLeads.some((l) => l.status === "Disputed"),
+    }));
+
+    return NextResponse.json({ orders: annotated });
   } catch {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
