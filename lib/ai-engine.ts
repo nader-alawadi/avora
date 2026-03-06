@@ -637,7 +637,9 @@ Return this exact JSON:
   "englishSummary": "2-3 sentence outreach playbook summary always in English"
 }`;
 
-  return parseJson(await callClaude(prompt, 8000), "Outreach");
+  const result = parseJson(await callClaude(prompt, 8000), "Outreach");
+  console.log("[ai-engine] generateOutreach result:", JSON.stringify(result, null, 2));
+  return result;
 }
 
 // ── Lookalike ─────────────────────────────────────────────────────────────────
