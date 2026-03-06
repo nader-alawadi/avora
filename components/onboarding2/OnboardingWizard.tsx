@@ -708,18 +708,25 @@ export default function OnboardingWizard() {
       });
 
       if (!res.ok) {
-        let errMsg = "Report generation failed. Please try again.";
+        let errMsg = lang === "ar"
+          ? "فشل توليد التقرير. يرجى المحاولة مرة أخرى."
+          : "Report generation failed. Please try again.";
+        let isCreditError = false;
         try {
           const data = await res.json();
           console.error("[handleGenerate] API error:", res.status, data);
-          if (data.error === "REGEN_CREDIT_REQUIRED") {
+          if (res.status === 402 || data.error === "REGEN_CREDIT_REQUIRED") {
+            isCreditError = true;
             errMsg = lang === "ar"
-              ? "لقد استهلكت حد الإنشاء الشهري. يرجى التواصل مع الدعم."
-              : "You have used your monthly generation credit. Please contact support.";
+              ? "لديك تقرير مُنشأ بالفعل هذا الشهر. سيتم تحويلك إلى لوحة التحكم."
+              : "You already have a report for this month. Redirecting you to the dashboard.";
           }
         } catch { /* non-JSON response */ }
         setGenerateError(errMsg);
         setGenerating(false);
+        if (isCreditError) {
+          setTimeout(() => { window.location.href = "/dashboard"; }, 3000);
+        }
         return;
       }
 
