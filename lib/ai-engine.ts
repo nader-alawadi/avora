@@ -281,9 +281,9 @@ Use the Seasonal Intelligence above to enrich ALL report sections:
 
 // ── Claude API call ───────────────────────────────────────────────────────────
 
-async function callClaude(prompt: string, maxTokens = 4096): Promise<string> {
+async function callClaude(prompt: string, maxTokens = 4096, model = "claude-sonnet-4-6"): Promise<string> {
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model,
     max_tokens: maxTokens,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
@@ -514,6 +514,14 @@ Target personas: "${ctx.jobTitles}".
 Best result / social proof to reference: "${ctx.bestResult || ctx.notableClients}".
 ${coldCallBlock}
 
+CRITICAL REQUIREMENT — ACTUAL WRITTEN COPY ONLY:
+Every "body", "message", "script", "opening", "qualify", "pitch", "reframe", and "close" field MUST contain the ACTUAL WRITTEN TEXT that a salesperson would say or send — NOT a description of what should be written.
+WRONG: "Cold email body personalised to their pain"
+RIGHT: "مرحباً [الاسم]، لاحظت أن شركتكم في [المجال]..."
+WRONG: "Opening line using pattern interrupt"
+RIGHT: "أهلاً، أنا [الاسم] من أفورا — وصلتك لأنك مسؤول عن نمو المبيعات في شركتك، صح؟"
+Write COMPLETE messages — do not truncate. If writing in Arabic, write in ${dialect}. Every sequence step must have the full message text ready to copy-paste and use.
+
 Return this exact JSON:
 {
   "title": "Outreach Playbook",
@@ -629,71 +637,107 @@ Return this exact JSON:
   "englishSummary": "2-3 sentence outreach playbook summary always in English"
 }`;
 
-  return parseJson(await callClaude(prompt, 6000), "Outreach");
+  return parseJson(await callClaude(prompt, 8000), "Outreach");
 }
 
 // ── Lookalike ─────────────────────────────────────────────────────────────────
 
 async function generateLookalike(ctx: OnboardingContext, lang: string, mode: string, now: Date) {
-  const prompt = `${buildContext(ctx, lang, mode, now)}
+  const LOOKALIKE_MODEL = "claude-sonnet-4-5-20251001";
 
-Generate the Lookalike Account Criteria section.
+  // ── Call 1: Criteria, search queries, and boolean strings ─────────────────
+  const criteriaPrompt = `${buildContext(ctx, lang, mode, now)}
+
+Generate the Lookalike Account Criteria section — Part 1: Criteria, Search Queries, and Boolean Strings.
 Target market: ${ctx.industries} companies in ${ctx.countries} with ${ctx.targetCompanySize} employees.
 Buying triggers: ${ctx.buyingTriggers}.
 Job titles to reach: ${ctx.jobTitles}.
 
-For the recommendedCompanies table: identify 10 REAL companies that closely match this ICP.
-Use your knowledge of ${ctx.countries} and ${ctx.industries} markets to name real organisations.
-For each company provide: name, website domain, why they match (1 sentence), and a score 1-100 for each dimension.
-
-Return this exact JSON:
+Return this exact JSON (no additional fields):
 {
   "title": "Lookalike Account Criteria",
   "criteria": [
-    { "category": "Industry & Vertical", "criteria": ["3-4 criteria"], "rationale": "brief rationale" },
-    { "category": "Company Size & Stage", "criteria": ["3-4 criteria"], "rationale": "brief rationale" },
-    { "category": "Tech Stack Signals", "criteria": ["3-4 signals"], "rationale": "brief rationale" },
-    { "category": "Behavioral Signals", "criteria": ["3-4 signals"], "rationale": "brief rationale" },
-    { "category": "Buying Trigger Signals", "criteria": ["3-4 observable triggers"], "rationale": "brief rationale" }
+    { "category": "Industry & Vertical", "criteria": ["3-4 specific criteria matching the industries and products in context"], "rationale": "brief rationale" },
+    { "category": "Company Size & Stage", "criteria": ["3-4 criteria based on employee range and deal size"], "rationale": "brief rationale" },
+    { "category": "Tech Stack Signals", "criteria": ["3-4 tech signals this ICP likely uses or is considering"], "rationale": "brief rationale" },
+    { "category": "Behavioral Signals", "criteria": ["3-4 observable behavioral signals indicating buying intent"], "rationale": "brief rationale" },
+    { "category": "Buying Trigger Signals", "criteria": ["3-4 observable buying trigger events from the context"], "rationale": "brief rationale" }
   ],
   "searchQueries": {
     "linkedin": [
-      "LinkedIn Sales Navigator filter set 1 — specific to the ICP",
-      "LinkedIn Sales Navigator filter set 2"
+      "LinkedIn Sales Navigator filter set 1 — specific to job titles, industry, geography, and company size from context",
+      "LinkedIn Sales Navigator filter set 2 — alternative targeting angle"
     ],
     "google": [
-      "Google search query 1 using site: and filetype: operators",
-      "Google search query 2"
+      "Google search query 1 using site:, filetype:, and industry-specific keywords from context",
+      "Google search query 2 using intent signals and geography"
     ],
     "crunchbase": [
-      "Crunchbase filter set description"
+      "Crunchbase filter set: specific industry tags, employee range, and geography from context"
     ]
   },
   "booleanStrings": [
-    "(\"VP Sales\" OR \"Head of Sales\" OR \"Sales Director\") AND (\"SaaS\" OR \"software\") AND (\"Egypt\" OR \"Cairo\")",
-    "Boolean string 2 tailored to job titles and geography"
-  ],
-  "recommendedCompanies": [
-    {
-      "company": "Real company name",
-      "website": "domain.com",
-      "industry": "their industry",
-      "whyTheyMatch": "1 sentence on why they match this ICP",
-      "scores": {
-        "industryFit": 85,
-        "sizeFit": 90,
-        "geographyFit": 95,
-        "triggerFit": 80,
-        "overall": 88
-      }
-    }
+    "Boolean string 1 — tailored to job titles from context AND relevant industries AND target geography",
+    "Boolean string 2 — alternative angle using buying triggers and company type"
   ],
   "summary": "2-3 sentence lookalike strategy summary in ${lang}",
   "englishSummary": "2-3 sentence lookalike strategy summary always in English",
   "disclaimer": "Company suggestions are based on AI knowledge and should be verified before outreach. Use the search criteria above to build your own validated account list."
 }`;
 
-  return parseJson(await callClaude(prompt, 5000), "Lookalike");
+  const criteriaResult = parseJson(
+    await callClaude(criteriaPrompt, 8000, LOOKALIKE_MODEL),
+    "Lookalike-Criteria"
+  );
+
+  // ── Call 2: 10 real recommended companies ─────────────────────────────────
+  const companiesPrompt = `${buildContext(ctx, lang, mode, now)}
+
+Generate 10 REAL recommended companies that closely match this ICP.
+
+Target: ${ctx.industries} companies in ${ctx.countries} with ${ctx.targetCompanySize} employees.
+Job titles to reach: ${ctx.jobTitles}.
+Buying triggers that make them a strong fit: ${ctx.buyingTriggers}.
+Selling: ${ctx.productName} — ${ctx.description}
+
+REQUIREMENTS:
+1. Name 10 REAL, actual companies you know exist in ${ctx.countries} and ${ctx.industries}.
+2. Use their real website domain (e.g., company.com, company.com.eg, company.sa).
+3. Each company must genuinely operate in or serve ${ctx.countries}.
+4. Provide a specific 1-sentence reason WHY they match (reference their actual industry or known characteristic).
+5. Score each on a scale of 1–100 for: industryFit, sizeFit, geographyFit, triggerFit, and overall.
+6. Do NOT use placeholder names. Do NOT use "Example Corp" or generic names.
+
+Return this exact JSON (array of exactly 10 objects):
+{
+  "companies": [
+    {
+      "company": "Actual real company name",
+      "website": "their-real-domain.com",
+      "industry": "their specific industry vertical",
+      "whyTheyMatch": "1 specific sentence explaining why they fit this ICP — reference something real about them",
+      "scores": {
+        "industryFit": 85,
+        "sizeFit": 78,
+        "geographyFit": 92,
+        "triggerFit": 80,
+        "overall": 84
+      }
+    }
+  ]
+}`;
+
+  const companiesResult = parseJson(
+    await callClaude(companiesPrompt, 8000, LOOKALIKE_MODEL),
+    "Lookalike-Companies"
+  );
+
+  // ── Merge both results ────────────────────────────────────────────────────
+  const companies = Array.isArray((companiesResult as Record<string, unknown>).companies)
+    ? (companiesResult as { companies: unknown[] }).companies
+    : [];
+
+  return { ...criteriaResult, recommendedCompanies: companies };
 }
 
 // ── Success Probability ───────────────────────────────────────────────────────
