@@ -110,9 +110,8 @@ export async function GET() {
           ]);
 
         // thisMonth stats
-        const thisMonthQualified = thisMonthLeads.filter((l) => l.status !== "Disputed").length;
-        const thisMonthRejected = thisMonthLeads.filter((l) => l.status === "Disputed").length;
-        const thisMonthTotal = thisMonthLeads.length;
+const thisMonthQualified = thisMonthLeads.filter((l: any) => l.status !== "Disputed").length;
+const thisMonthRejected = thisMonthLeads.filter((l: any) => l.status === "Disputed").length;
 
         // allTime stats
         const allTimeQualified = allTimeLeads.filter((l) => l.status !== "Disputed").length;
