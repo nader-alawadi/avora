@@ -22,6 +22,9 @@ function createPrismaClient() {
     url = `file:///${normalizedPath}`;
   }
 
+  console.log("[prisma] DATABASE_URL env:", process.env.DATABASE_URL);
+  console.log("[prisma] Final URL passed to PrismaLibSql:", url);
+
   const adapter = new PrismaLibSql({ url });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return new PrismaClient({ adapter } as any);
