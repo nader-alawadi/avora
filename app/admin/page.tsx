@@ -223,28 +223,28 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-[#1E6663] text-white px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <header className="bg-[#0A1628] text-white px-6 py-4 flex items-center justify-between border-b border-white/8">
         <div>
-          <h1 className="font-bold text-xl">AVORA Admin</h1>
-          <p className="text-white/70 text-xs">Enigma Sales Internal Panel</p>
+          <h1 className="font-bold text-xl tracking-tight">AVORA Admin</h1>
+          <p className="text-white/40 text-xs">Enigma Sales Internal Panel</p>
         </div>
         <div className="flex items-center gap-4">
           {session && (
             <div className="text-right">
-              <p className="text-white/90 text-xs font-medium">{session.name || session.email}</p>
+              <p className="text-white/80 text-xs font-semibold">{session.name || session.email}</p>
               {session.adminRole && (
-                <p className="text-white/50 text-[10px]">{ROLE_LABELS[session.adminRole] || session.adminRole}</p>
+                <p className="text-white/35 text-[10px]">{ROLE_LABELS[session.adminRole] || session.adminRole}</p>
               )}
             </div>
           )}
-          <a href="/dashboard" className="text-white/80 hover:text-white text-sm">← Dashboard</a>
+          <a href="/dashboard" className="text-white/60 hover:text-white text-sm transition-colors">← Dashboard</a>
           <button
             onClick={async () => {
               await fetch("/api/auth/logout", { method: "POST" });
               router.push("/");
             }}
-            className="text-white/80 hover:text-white text-sm"
+            className="text-white/60 hover:text-red-400 text-sm transition-colors"
           >
             Sign Out
           </button>
@@ -260,7 +260,7 @@ export default function AdminPage() {
               onClick={() => handleTabChange(tab)}
               className={`relative px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab
-                  ? "border-[#1E6663] text-[#1E6663]"
+                  ? "border-[#2563EB] text-[#2563EB]"
                   : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >

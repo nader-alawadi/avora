@@ -1,40 +1,75 @@
 @import "tailwindcss";
 
 :root {
-  --teal: #1E6663;
-  --teal-dark: #154f4c;
-  --teal-deeper: #0d3d30;
-  --coral: #FF6B63;
-  --coral-dark: #e55d55;
+  /* ── New Lusha-inspired Design System ─── */
+  --navy: #0A1628;
+  --navy-light: #0F1F3D;
+  --navy-mid: #162034;
+  --blue: #2563EB;
+  --blue-light: #3B82F6;
+  --blue-dark: #1D4ED8;
+  --purple: #7C3AED;
+  --purple-light: #8B5CF6;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+
+  /* Text */
+  --text-dark: #1E293B;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
+
+  /* Backgrounds */
   --bg: #FFFFFF;
-  --text: #1F2A2A;
-  --text-muted: #6b7280;
-  --border: rgba(0,0,0,0.08);
+  --bg-subtle: #F8FAFC;
+  --bg-muted: #F1F5F9;
+
+  /* Border */
+  --border: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.12);
+
+  /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-lg: 0 16px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
-  --shadow-teal: 0 8px 24px rgba(30,102,99,0.25);
-  --shadow-coral: 0 8px 24px rgba(255,107,99,0.25);
+  --shadow-md: 0 4px 24px rgba(0,0,0,0.08);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.12);
+  --shadow-xl: 0 24px 64px rgba(0,0,0,0.16);
+  --shadow-blue: 0 8px 32px rgba(37,99,235,0.3);
+  --shadow-purple: 0 8px 32px rgba(124,58,237,0.3);
+
+  /* Legacy compat */
+  --teal: #2563EB;
+  --teal-dark: #1D4ED8;
+  --teal-deeper: #1E3A8A;
+  --coral: #7C3AED;
+  --coral-dark: #6D28D9;
+  --text: #1E293B;
+  --shadow-teal: var(--shadow-blue);
+  --shadow-coral: var(--shadow-purple);
 }
+
+/* ── Inter font ─────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 body {
   background: var(--bg);
-  color: var(--text);
+  color: var(--text-dark);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* ── Scrollbar ─────────────────────────────────────────── */
+/* ── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #f1f5f9; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* ── Glassmorphism ─────────────────────────────────────── */
+/* ── Glassmorphism ─────────────────────────────────────────── */
 .glass {
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(16px) saturate(180%);
@@ -43,57 +78,177 @@ body {
 }
 
 .glass-dark {
-  background: rgba(13, 61, 48, 0.55);
+  background: rgba(10, 22, 40, 0.55);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* ── Skeleton shimmer ──────────────────────────────────── */
+.glass-navy {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Skeleton shimmer ──────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -700px 0; }
   100% { background-position: 700px 0; }
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #f0f4f4 25%, #e4ebea 50%, #f0f4f4 75%);
+  background: linear-gradient(90deg, #f0f4f8 25%, #e4ebf5 50%, #f0f4f8 75%);
   background-size: 700px 100%;
   animation: shimmer 1.4s infinite linear;
   border-radius: 6px;
 }
 
-/* ── Gradient text ─────────────────────────────────────── */
-.text-gradient-teal {
-  background: linear-gradient(135deg, #1E6663, #4ecdc4);
+/* ── Gradient text ─────────────────────────────────────────── */
+.text-gradient {
+  background: linear-gradient(135deg, #2563EB, #7C3AED);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* ── Card hover lift ───────────────────────────────────── */
+.text-gradient-teal {
+  background: linear-gradient(135deg, #2563EB, #7C3AED);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-blue {
+  background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Card hover lift ───────────────────────────────────────── */
 .card-hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.12);
 }
 
-/* ── RTL support ───────────────────────────────────────── */
+/* ── RTL support ───────────────────────────────────────────── */
 [dir="rtl"] { text-align: right; }
 
-/* ── Gradient backgrounds ──────────────────────────────── */
+/* ── Gradient backgrounds ──────────────────────────────────── */
 .gradient-hero {
-  background: linear-gradient(135deg, #0d3d30 0%, #154f4c 40%, #1E6663 100%);
+  background: linear-gradient(135deg, #0A1628 0%, #0F1F3D 50%, #162034 100%);
+}
+
+.gradient-blue-purple {
+  background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
 }
 
 .gradient-teal-subtle {
-  background: linear-gradient(135deg, #f0f9f8 0%, #e6f4f3 100%);
+  background: linear-gradient(135deg, #F0F4FF 0%, #F5F0FF 100%);
 }
 
-/* ── Pulse glow ────────────────────────────────────────── */
+.gradient-dark-section {
+  background: linear-gradient(135deg, #0A1628 0%, #0D1B34 100%);
+}
+
+/* ── Pulse glow ────────────────────────────────────────────── */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(30,102,99,0.4); }
-  50%       { box-shadow: 0 0 0 8px rgba(30,102,99,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(37,99,235,0); }
 }
 .pulse-glow { animation: pulse-glow 2s infinite; }
+
+/* ── Floating orbs ─────────────────────────────────────────── */
+@keyframes float-orb {
+  0%, 100% { transform: translateY(-20px); }
+  50%       { transform: translateY(20px); }
+}
+.float-orb {
+  animation: float-orb 6s ease-in-out infinite;
+}
+.float-orb-delayed {
+  animation: float-orb 8s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+/* ── Marquee animation ─────────────────────────────────────── */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee-track {
+  animation: marquee 30s linear infinite;
+  width: max-content;
+}
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ── Number counter animation ─────────────────────────────── */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Input focus ring ──────────────────────────────────────── */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+}
+
+/* ── Shake animation for errors ────────────────────────────── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-8px); }
+  40%       { transform: translateX(8px); }
+  60%       { transform: translateX(-6px); }
+  80%       { transform: translateX(6px); }
+}
+.shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* ── Smooth tab indicator ──────────────────────────────────── */
+.tab-indicator {
+  transition: left 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Toggle switch ─────────────────────────────────────────── */
+.toggle-thumb {
+  transition: transform 0.2s ease;
+}
+
+/* ── Success checkmark ─────────────────────────────────────── */
+@keyframes check-scale {
+  0%    { transform: scale(0); opacity: 0; }
+  60%   { transform: scale(1.15); opacity: 1; }
+  100%  { transform: scale(1); opacity: 1; }
+}
+.check-animate {
+  animation: check-scale 0.4s ease-out forwards;
+}
+
+/* ── Blue glow button ──────────────────────────────────────── */
+.btn-glow-blue {
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+}
+.btn-glow-blue:hover {
+  box-shadow: 0 8px 30px rgba(37, 99, 235, 0.5);
+}
+
+/* ── Hero gradient text ────────────────────────────────────── */
+.hero-gradient-text {
+  background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Section divider ───────────────────────────────────────── */
+.section-divider {
+  background: linear-gradient(90deg, transparent, rgba(37,99,235,0.2), transparent);
+  height: 1px;
+}

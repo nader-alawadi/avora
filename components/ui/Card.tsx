@@ -28,8 +28,8 @@ export function Card({
     <div
       className={clsx(
         glass
-          ? "glass rounded-xl shadow-md border-white/50"
-          : "bg-white rounded-xl border border-gray-200 shadow-sm",
+          ? "glass rounded-2xl shadow-md border-white/50"
+          : "bg-white rounded-2xl border border-gray-100 shadow-sm",
         paddings[padding],
         hover && "card-hover cursor-default",
         className
@@ -56,23 +56,23 @@ export function KpiCard({
   color = "teal",
 }: KpiCardProps) {
   const colors = {
-    teal: "bg-[#1E6663]/10 text-[#1E6663]",
-    coral: "bg-[#FF6B63]/10 text-[#FF6B63]",
+    teal: "bg-[#DBEAFE] text-[#2563EB]",
+    coral: "bg-[#EDE9FE] text-[#7C3AED]",
     gray: "bg-gray-100 text-gray-600",
-    green: "bg-green-100 text-green-700",
+    green: "bg-[#D1FAE5] text-[#059669]",
     yellow: "bg-yellow-100 text-yellow-700",
   };
 
   return (
     <Card hover className="flex items-start gap-4">
       {icon && (
-        <div className={clsx("p-3 rounded-lg flex-shrink-0", colors[color])}>
+        <div className={clsx("p-3 rounded-xl flex-shrink-0", colors[color])}>
           {icon}
         </div>
       )}
       <div>
-        <p className="text-sm text-gray-500 font-medium">{title}</p>
-        <p className="text-2xl font-bold text-[#1F2A2A] mt-0.5">{value}</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{title}</p>
+        <p className="text-2xl font-extrabold text-[#1E293B] mt-1">{value}</p>
         {subtitle && (
           <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>
         )}
