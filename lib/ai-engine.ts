@@ -4,39 +4,83 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// ── Context interface ─────────────────────────────────────────────────────────
+// Maps all 12 wizard steps into a single flat context object.
+
 export interface OnboardingContext {
-  language: string;
+  // Meta
+  language: string;           // "ar" | "en"
+
+  // Step 0 – Company Identity
   companyName: string;
-  offer: string;
-  problem: string;
-  pricingRange: string;
-  salesCycleRange: string;
-  geoTargets: string;
-  icpHypothesis: string;
-  bestCustomer1: string;
-  bestCustomer2: string;
-  lostDeal: string;
-  whyWeWin: string;
+  website: string;
+  employees: string;          // "1-10" | "11-50" | "51-200" | "200+"
+  annualRevenue: string;      // "<100k" | "100k-500k" | ...
+  linkedin: string;
+  logoUrl: string;
+
+  // Step 1 – What You Sell
+  productName: string;
+  productType: string;        // "product"|"service"|"saas"|"consulting"|"agency"
+  description: string;
+  pricingModel: string;       // "one-time"|"monthly"|"project"|"commission"|"freemium"
+  dealSize: string;           // "<1k"|"1k-5k"|"5k-20k"|"20k-100k"|"100k+"
+  salesCycle: string;         // "same-day"|"1-2w"|"1-3m"|"3-6m"|"6m+"
+
+  // Step 2 – Current Sales Process
+  leadSources: string;        // comma-joined list
+  tools: string;              // comma-joined list
+  hasTeam: boolean;
+  teamSize: string;
+  roles: string;              // comma-joined list
+
+  // Step 3 – Challenges
+  topChallenges: string;      // comma-joined list
+  biggestPain: string;
+
+  // Step 4 – Target Market
+  countries: string;          // comma-joined list
+  industries: string;         // comma-joined list
+  targetCompanySize: string;  // comma-joined list
+  b2bOrB2c: string;           // "b2b" | "b2c"
+
+  // Step 5 – ICP Hints
+  jobTitles: string;
+  buyingTriggers: string;     // comma-joined list
+  disqualifiers: string;
+
+  // Step 6 – Sales Targets
+  meetingTarget: string;
+  dealsTarget: string;
+  revenueTarget: string;      // "<50k"|"50k-200k"|...
+  mainMetric: string;
+
+  // Step 7 – Success Stories
+  successFiles: string;       // comma-joined file URLs
+  bestResult: string;
+  notableClients: string;
+
+  // Step 8 – Competition & Positioning
   competitors: string;
   differentiation: string;
-  disqualifiers: string;
-  economicBuyer: string;
-  champion: string;
-  technicalBuyer: string;
-  endUser: string;
-  influencer: string;
-  objections: string;
-  titles: string;
-  currentChannels: string;
-  teamSize: string;
-  tools: string;
-  capacity: string;
-  industry: string;
-  employeeRange: string;
-  revenueRange: string;
+  valueProposition: string;
+
+  // Step 9 – Outreach Preferences
+  outreachChannels: string;   // comma-joined list
+  outreachLang: string;       // "ar"|"en"|"both"
+  tone: string;               // "formal"|"semi-formal"|"casual"
+  wantsColdCall: boolean;
+  wantsEmailSeq: boolean;
+  wantsLinkedinSeq: boolean;
+  wantsWhatsappSeq: boolean;
+
+  // Step 10 – Company Documents (file URLs, informational)
+  profileFiles: string;
+  brochureFiles: string;
 }
 
-// Approximate Ramadan windows (start month 0-indexed, start day, end month, end day)
+// ── Ramadan / seasonal helpers ────────────────────────────────────────────────
+
 const RAMADAN_WINDOWS: Record<number, { startMonth: number; startDay: number; endMonth: number; endDay: number }> = {
   2024: { startMonth: 2, startDay: 11, endMonth: 3, endDay: 9 },
   2025: { startMonth: 2, startDay: 1,  endMonth: 2, endDay: 30 },
@@ -49,12 +93,9 @@ function isRamadan(date: Date): boolean {
   const year = date.getFullYear();
   const window = RAMADAN_WINDOWS[year];
   if (!window) return false;
-  const month = date.getMonth();
-  const day = date.getDate();
-  const startTotal = window.startMonth * 100 + window.startDay;
-  const endTotal = window.endMonth * 100 + window.endDay;
-  const currentTotal = month * 100 + day;
-  return currentTotal >= startTotal && currentTotal <= endTotal;
+  const current = date.getMonth() * 100 + date.getDate();
+  return current >= window.startMonth * 100 + window.startDay &&
+         current <= window.endMonth * 100 + window.endDay;
 }
 
 function getSeason(month: number, geo: string): string {
@@ -63,7 +104,6 @@ function getSeason(month: number, geo: string): string {
   const isEurope = /europe|uk|france|germany|spain|italy|netherlands/i.test(geo);
 
   if (isGulf || isNorthAfrica) {
-    // MENA seasons
     if (month >= 2 && month <= 4) return "Spring";
     if (month >= 5 && month <= 8) return "Summer (hot season — slower enterprise sales)";
     if (month >= 9 && month <= 10) return "Autumn";
@@ -75,23 +115,21 @@ function getSeason(month: number, geo: string): string {
     if (month >= 8 && month <= 10) return "Autumn";
     return "Winter";
   }
-  // Default northern hemisphere
   if (month >= 2 && month <= 4) return "Spring";
   if (month >= 5 && month <= 7) return "Summer";
   if (month >= 8 && month <= 10) return "Autumn";
   return "Winter";
 }
 
-function buildSeasonalContext(now: Date, geoTargets: string, industry: string): string {
-  const month = now.getMonth(); // 0-indexed
+function buildSeasonalContext(now: Date, countries: string, industries: string): string {
+  const month = now.getMonth();
   const monthName = now.toLocaleString("en-US", { month: "long" });
   const year = now.getFullYear();
-  const season = getSeason(month, geoTargets);
+  const season = getSeason(month, countries);
   const ramadan = isRamadan(now);
 
   const insights: string[] = [];
 
-  // Ramadan context
   if (ramadan) {
     insights.push(
       "It is currently Ramadan — decision-making slows significantly in MENA markets. " +
@@ -101,128 +139,163 @@ function buildSeasonalContext(now: Date, geoTargets: string, industry: string): 
     );
   }
 
-  // Month-specific opportunities
   const monthInsights: Partial<Record<number, string>> = {
-    0: "January — New fiscal year in many regions. Budgets are freshly allocated; emphasize ROI and strategic priorities for Q1. Great time to reach decision-makers setting annual vendor plans.",
+    0: "January — New fiscal year; budgets freshly allocated. Emphasize ROI and Q1 strategic priorities. Ideal for reaching decision-makers setting annual vendor plans.",
     1: "February — Q1 pipeline-building month. Push urgency around Q1 goals. In MENA, pre-Ramadan decisions may accelerate.",
-    2: "March — End of Q1; deals should close before quarter-end. In Egypt and MENA, post-Ramadan momentum picks up. International schools and education sector begin academic-year planning (strong for EdTech/LMS).",
-    3: "April — Post-Ramadan and Eid recovery month. MENA markets re-engage after holiday. New semester starts in many regions — strong for EdTech, training, and HR tech.",
-    4: "May — International school year ending in many MENA/Egypt markets. Strong window for EdTech, LMS, and academic software vendors. Universities finalizing next-year budgets.",
+    2: "March — Q1 end; close deals before quarter-end. Post-Ramadan momentum picks up in Egypt and MENA. Education sector begins academic-year planning.",
+    3: "April — Post-Ramadan and Eid recovery. MENA markets re-engage. New semester starts — strong for EdTech, training, and HR tech.",
+    4: "May — International school year ending in MENA/Egypt. Strong window for EdTech, LMS, and academic software. Universities finalizing next-year budgets.",
     5: "June — H1 close pressure. Push for deals before mid-year budget reviews. Summer slowdown begins in Gulf region.",
-    6: "July — Summer slowdown in Europe and Gulf. Decision-makers on holiday. Focus on nurturing, content marketing, and expanding pipeline for Q3.",
-    7: "August — Back-to-business month in MENA and Egypt after summer. European market returns. Good time to re-engage stalled deals.",
-    8: "September — Strong buying season; Q3 ends, Q4 budgets being finalized. New academic year in full swing — prime for EdTech/LMS/HR platforms.",
-    9: "October — Year-end budget cycles accelerating. Companies rushing to spend remaining budgets before fiscal year end (for Dec/Jan FY). ABM urgency is high. Healthcare and government often have 'use it or lose it' budgets.",
-    10: "November — Final push before year-end. Last chance for annual contracts. Emphasize multi-year deals, implementation timelines, and end-of-year pricing incentives.",
-    11: "December — Holiday slowdown in Western markets. Strong close month for deals already in negotiation. MENA markets remain active. Focus on renewal conversations and Q1 pipeline seeding.",
+    6: "July — Summer slowdown in Europe and Gulf. Focus on nurturing and pipeline-building for Q3.",
+    7: "August — Back-to-business in MENA and Egypt after summer. European market returns. Good time to re-engage stalled deals.",
+    8: "September — Strong buying season; Q3 ends, Q4 budgets finalizing. New academic year — prime for EdTech/LMS/HR platforms.",
+    9: "October — Year-end budget cycles accelerating. Companies spending remaining budgets. Healthcare and government have 'use it or lose it' budgets. ABM urgency is high.",
+    10: "November — Final push before year-end. Last chance for annual contracts. Emphasize multi-year deals and end-of-year pricing incentives.",
+    11: "December — Holiday slowdown in Western markets. Strong close month for deals already in negotiation. MENA markets remain active. Focus on Q1 pipeline seeding.",
   };
 
-  if (monthInsights[month]) {
-    insights.push(monthInsights[month]!);
-  }
+  if (monthInsights[month]) insights.push(monthInsights[month]!);
 
-  // Industry + month specific opportunities
-  const industryLower = industry.toLowerCase();
-  if (month === 4 && /lms|edtech|education|e-learning|learning/i.test(industryLower)) {
-    insights.push("May is peak season for LMS and EdTech vendors targeting international schools in Egypt — schools finalize next-year platform decisions before summer break.");
-  }
-  if ((month === 9 || month === 10) && /saas|software|tech|crm|erp/i.test(industryLower)) {
-    insights.push("October-November: Enterprise software buyers are under year-end budget pressure — accelerate negotiations and offer Q4 incentives.");
-  }
-  if (month === 8 && /hr|recruitment|talent|hiring|workforce/i.test(industryLower)) {
+  // Industry-specific seasonality
+  const ind = industries.toLowerCase();
+  if (month === 4 && /lms|edtech|education|e-learning|learning/i.test(ind))
+    insights.push("May is peak season for LMS and EdTech targeting international schools in Egypt — schools finalize next-year platform decisions before summer break.");
+  if ((month === 9 || month === 10) && /saas|software|tech|crm|erp/i.test(ind))
+    insights.push("October–November: Enterprise software buyers are under year-end budget pressure — accelerate negotiations and offer Q4 incentives.");
+  if (month === 8 && /hr|recruitment|talent|hiring|workforce/i.test(ind))
     insights.push("September: HR tech buying season — companies plan headcount and HR platform investments for Q4 and next year.");
-  }
-  if (/egypt|cairo/i.test(geoTargets) && month >= 5 && month <= 7) {
-    insights.push("Egyptian market summer (June-August): Government and large enterprises slow down. Focus on SME and private sector targets that remain active year-round.");
-  }
+  if (/egypt|cairo/i.test(countries) && month >= 5 && month <= 7)
+    insights.push("Egyptian market summer (June–August): Government and large enterprises slow down. Focus on SME and private sector targets that remain active year-round.");
+  if (/saudi|ksa/i.test(countries) && month >= 9 && month <= 11)
+    insights.push("Saudi Arabia Q4: Vision 2030-aligned spending accelerates in October–December; strong for digital transformation, fintech, and PropTech vendors.");
+  if (/saas|software/i.test(ind) && /egypt|saudi|uae/i.test(countries))
+    insights.push("MENA SaaS market: Fastest growth in cloud adoption Q3–Q4 as enterprises seek to deploy budgets before year-end freeze.");
+  if (/ecom|e-commerce|retail/i.test(ind))
+    insights.push("E-commerce/Retail: Peak sales season is November–January (Black Friday, Eid, Christmas). Platform and tool vendors should intensify outreach now to be live before the rush.");
+  if (/real.?estate|realestate|proptech/i.test(ind))
+    insights.push("Real estate: Strongest buying cycles in MENA are post-Ramadan (May) and post-summer (September). Transaction volumes peak before year-end holidays.");
 
-  const context = [
+  return [
     `Current Date: ${monthName} ${year}`,
     `Current Season: ${season}`,
     ramadan ? "Religious Context: Currently Ramadan" : "",
     `Seasonal Intelligence:\n${insights.map((i) => `  - ${i}`).join("\n")}`,
   ].filter(Boolean).join("\n");
-
-  return context;
 }
 
+// ── System prompt ─────────────────────────────────────────────────────────────
+
 const SYSTEM_PROMPT = `You are AVORA, a Senior GTM Strategist AI for Enigma Sales.
-You specialize in B2B go-to-market strategy, ICP definition, DMU mapping, and outreach playbooks.
+You specialize in B2B go-to-market strategy, ICP definition, DMU mapping, account-based marketing, and multi-channel outreach playbooks.
 You are analytical, precise, and data-driven. You NEVER fabricate data or make unfounded assumptions.
 Always respond in the user's specified language (English or Arabic).
 Your outputs are structured, actionable, and tailored to the specific business context provided.
 Return ONLY valid JSON — no markdown, no code fences, no explanation text.`;
 
-function buildContext(context: OnboardingContext, lang: string, mode: string, now: Date = new Date()): string {
-  const seasonalContext = buildSeasonalContext(now, context.geoTargets || "", context.industry || "");
+// ── Context builder ───────────────────────────────────────────────────────────
+
+function buildContext(ctx: OnboardingContext, lang: string, mode: string, now: Date = new Date()): string {
+  const seasonal = buildSeasonalContext(now, ctx.countries || "", ctx.industries || "");
+
+  // Derive outreach language/dialect for messaging
+  const isArabic = ctx.outreachLang === "ar" || ctx.outreachLang === "both";
+  const hasEgypt  = /egypt|eg\b/i.test(ctx.countries);
+  const hasGulf   = /saudi|uae|qatar|kuwait|gulf|sa\b|ae\b|qa\b|kw\b/i.test(ctx.countries);
+  const dialect = isArabic
+    ? (hasEgypt ? "Egyptian Arabic dialect" : hasGulf ? "Gulf Arabic dialect" : "Modern Standard Arabic")
+    : "English";
 
   return `Language: ${lang}
-Mode: ${mode === "strict" ? "STRICT - comprehensive analysis" : "BALANCED - preliminary with warnings"}
+Mode: ${mode === "strict" ? "STRICT — comprehensive, data-driven analysis" : "BALANCED — preliminary with clear warnings about data gaps"}
 
-${seasonalContext}
+${seasonal}
 
-BUSINESS:
-- Company: ${context.companyName || "Not specified"}
-- Industry: ${context.industry || "Not specified"}
-- Offer: ${context.offer || "Not specified"}
-- Problem solved: ${context.problem || "Not specified"}
-- Pricing: ${context.pricingRange || "Not specified"}
-- Sales cycle: ${context.salesCycleRange || "Not specified"}
-- Geographies: ${context.geoTargets || "Not specified"}
-- ICP hypothesis: ${context.icpHypothesis || "Not specified"}
-- Company size target: ${context.employeeRange || "Not specified"}
-- Revenue target: ${context.revenueRange || "Not specified"}
+COMPANY:
+- Name: ${ctx.companyName || "Not specified"}
+- Website: ${ctx.website || "Not specified"}
+- Team size: ${ctx.employees || "Not specified"} employees
+- Annual revenue: ${ctx.annualRevenue || "Not specified"}
+- LinkedIn: ${ctx.linkedin || "Not specified"}
 
-EVIDENCE:
-- Best customer 1: ${context.bestCustomer1 || "Not provided"}
-- Best customer 2: ${context.bestCustomer2 || "Not provided"}
-- Lost deal: ${context.lostDeal || "Not provided"}
+PRODUCT / SERVICE:
+- Name: ${ctx.productName || "Not specified"}
+- Type: ${ctx.productType || "Not specified"}
+- Description: ${ctx.description || "Not specified"}
+- Pricing model: ${ctx.pricingModel || "Not specified"}
+- Average deal size: ${ctx.dealSize || "Not specified"}
+- Sales cycle: ${ctx.salesCycle || "Not specified"}
 
-VALUE PROP:
-- Why we win: ${context.whyWeWin || "Not specified"}
-- Competitors: ${context.competitors || "Not specified"}
-- Differentiation: ${context.differentiation || "Not specified"}
-- Disqualifiers: ${context.disqualifiers || "Not specified"}
+CURRENT SALES PROCESS:
+- Lead sources: ${ctx.leadSources || "Not specified"}
+- Tools used: ${ctx.tools || "Not specified"}
+- Has sales team: ${ctx.hasTeam ? "Yes" : "No"}
+- Team size: ${ctx.teamSize || "N/A"}
+- Sales roles: ${ctx.roles || "N/A"}
 
-DMU:
-- Economic buyer: ${context.economicBuyer || "Not specified"}
-- Champion: ${context.champion || "Not specified"}
-- Technical buyer: ${context.technicalBuyer || "Not specified"}
-- End user: ${context.endUser || "Not specified"}
-- Influencer: ${context.influencer || "Not specified"}
-- Objections: ${context.objections || "Not specified"}
-- Titles: ${context.titles || "Not specified"}
+CHALLENGES:
+- Top 3 challenges: ${ctx.topChallenges || "Not specified"}
+- Biggest pain in one sentence: ${ctx.biggestPain || "Not specified"}
 
-CHANNELS:
-- Current channels: ${context.currentChannels || "Not specified"}
-- Team size: ${context.teamSize || "Not specified"}
-- Tools: ${context.tools || "Not specified"}
-- Capacity: ${context.capacity || "Not specified"}
+TARGET MARKET:
+- Countries / regions: ${ctx.countries || "Not specified"}
+- Industries: ${ctx.industries || "Not specified"}
+- Target company size: ${ctx.targetCompanySize || "Not specified"}
+- B2B or B2C: ${ctx.b2bOrB2c || "Not specified"}
+
+ICP HINTS:
+- Target job titles: ${ctx.jobTitles || "Not specified"}
+- Buying triggers: ${ctx.buyingTriggers || "Not specified"}
+- Disqualifiers: ${ctx.disqualifiers || "Not specified"}
+
+SALES TARGETS:
+- Monthly meetings target: ${ctx.meetingTarget || "Not specified"}
+- Monthly deals target: ${ctx.dealsTarget || "Not specified"}
+- Annual revenue target: ${ctx.revenueTarget || "Not specified"}
+- Most important metric: ${ctx.mainMetric || "Not specified"}
+
+SOCIAL PROOF:
+- Best client result: ${ctx.bestResult || "Not provided"}
+- Notable clients: ${ctx.notableClients || "Not provided"}
+
+COMPETITION & POSITIONING:
+- Competitors: ${ctx.competitors || "Not specified"}
+- Differentiation: ${ctx.differentiation || "Not specified"}
+- Value proposition: ${ctx.valueProposition || "Not specified"}
+
+OUTREACH PREFERENCES:
+- Preferred channels: ${ctx.outreachChannels || "Not specified"}
+- Outreach language: ${ctx.outreachLang || "en"} (${dialect})
+- Message tone: ${ctx.tone || "semi-formal"}
+- Wants Cold Call scripts: ${ctx.wantsColdCall ? "YES" : "No"}
+- Wants Email sequences: ${ctx.wantsEmailSeq ? "YES" : "No"}
+- Wants LinkedIn sequences: ${ctx.wantsLinkedinSeq ? "YES" : "No"}
+- Wants WhatsApp sequences: ${ctx.wantsWhatsappSeq ? "YES" : "No"}
 
 SEASONAL INSTRUCTIONS:
-Use the Seasonal Intelligence above to enrich all 5 report sections:
-1. In ICP psychographics and triggers, factor in current seasonal buying patterns and priorities.
-2. In ABM strategy, adjust outreach timing recommendations and tier prioritization based on the current month and season.
-3. In the Outreach Playbook, adapt cadence and messaging to reflect seasonal context (e.g., avoid aggressive cold outreach during Ramadan fasting hours, emphasize year-end urgency in October-November, etc.).
-4. In ABM and ICP sections, call out specific seasonal opportunities relevant to the user's industry and geography.`;
+Use the Seasonal Intelligence above to enrich ALL report sections:
+1. ICP psychographics and triggers — factor in current seasonal buying patterns.
+2. ABM strategy — adjust timing recommendations and tier prioritization for the current month.
+3. Outreach Playbook — adapt cadence and messaging to seasonal context (e.g., avoid aggressive cold outreach during Ramadan fasting hours; emphasize year-end urgency in October–November; highlight Q4 budget-spend windows).
+4. Lookalike criteria — call out which account signals are most active this season.`;
 }
 
-async function callClaude(prompt: string): Promise<string> {
+// ── Claude API call ───────────────────────────────────────────────────────────
+
+async function callClaude(prompt: string, maxTokens = 4096): Promise<string> {
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
   });
 
   if (response.stop_reason === "max_tokens") {
-    throw new Error("Response was truncated — reduce content or split into smaller sections");
+    throw new Error("Response truncated — prompt is too long");
   }
 
   const content = response.content[0];
   if (content.type !== "text") throw new Error("Unexpected response type");
 
-  // Strip markdown code fences if model adds them despite instructions
   return content.text
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
@@ -234,253 +307,456 @@ function parseJson(text: string, section: string): Record<string, unknown> {
   try {
     return JSON.parse(text);
   } catch (err) {
-    // Attempt to extract JSON object from the text if there's surrounding noise
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch {
-        // fall through
-      }
+      try { return JSON.parse(match[0]); } catch { /* fall through */ }
     }
     console.error(`Failed to parse ${section} JSON:`, text.slice(0, 500));
-    throw new Error(`Invalid JSON in ${section} response: ${(err as Error).message}`);
+    throw new Error(`Invalid JSON in ${section}: ${(err as Error).message}`);
   }
 }
 
-async function generateIcp(context: OnboardingContext, lang: string, mode: string, now: Date) {
-  const prompt = `${buildContext(context, lang, mode, now)}
+// ── ICP ───────────────────────────────────────────────────────────────────────
 
-Generate the ICP (Ideal Customer Profile) section. Return this exact JSON structure:
+async function generateIcp(ctx: OnboardingContext, lang: string, mode: string, now: Date) {
+  const prompt = `${buildContext(ctx, lang, mode, now)}
+
+Generate the ICP (Ideal Customer Profile) section using ALL the context above, especially:
+- Job titles provided: ${ctx.jobTitles}
+- Buying triggers: ${ctx.buyingTriggers}
+- Target industries: ${ctx.industries}
+- Target countries: ${ctx.countries}
+- Target company sizes: ${ctx.targetCompanySize}
+- Disqualifiers: ${ctx.disqualifiers}
+- Deal size and sales cycle shape the psychographic urgency level.
+- B2B/B2C context: ${ctx.b2bOrB2c}
+
+Return this exact JSON:
 {
   "title": "ICP: [short descriptive name]",
   "firmographics": {
-    "industries": ["3-5 specific industries"],
-    "companySize": "employee range",
-    "revenue": "revenue range",
-    "geography": ["list of regions/countries"],
-    "techStack": ["relevant tech signals"]
+    "industries": ["3-5 specific industries matching context"],
+    "companySize": "employee range from context",
+    "revenue": "revenue range inferred from deal size and target market",
+    "geography": ["list of regions/countries from context"],
+    "techStack": ["3-5 relevant tech signals this ICP likely uses"]
   },
   "psychographics": {
-    "challenges": ["3-5 key pain points"],
+    "challenges": ["3-5 key pain points from the challenges and biggestPain fields"],
     "motivations": ["3-5 buying motivations"],
-    "priorities": ["3-5 strategic priorities"]
+    "priorities": ["3-5 strategic priorities this season"]
   },
-  "triggers": ["4-6 buying trigger events"],
-  "qualifiers": ["5-7 must-have qualification criteria"],
-  "disqualifiers": ["all disqualifiers from context"],
-  "summary": "2-3 sentence ICP summary in the response language",
-  "englishSummary": "2-3 sentence ICP summary always written in English regardless of response language",
-  "warnings": ["any data gaps if mode is balanced, empty array if strict"]
+  "triggers": ["4-6 buying triggers from context + seasonal buying events"],
+  "qualifiers": ["5-7 must-have qualification criteria based on job titles, size, industry, triggers"],
+  "disqualifiers": ["all disqualifiers provided + any inferred from context"],
+  "jobTitles": ["all target job titles expanded with variations"],
+  "summary": "2-3 sentence ICP summary in ${lang}",
+  "englishSummary": "2-3 sentence ICP summary always in English",
+  "seasonalNote": "1-2 sentence note on seasonal buying behaviour for this ICP right now",
+  "warnings": ["data gaps if mode is balanced, empty array if strict"]
 }`;
 
-  const text = await callClaude(prompt);
-  return parseJson(text, "ICP");
+  return parseJson(await callClaude(prompt), "ICP");
 }
 
-async function generateDmu(context: OnboardingContext, lang: string, mode: string, now: Date) {
-  const prompt = `${buildContext(context, lang, mode, now)}
+// ── DMU ───────────────────────────────────────────────────────────────────────
 
-Generate the DMU (Decision Making Unit) Map section. Return this exact JSON structure:
+async function generateDmu(ctx: OnboardingContext, lang: string, mode: string, now: Date) {
+  const prompt = `${buildContext(ctx, lang, mode, now)}
+
+Generate the DMU (Decision Making Unit) Map using the provided job titles, target company sizes, industries, and B2B context.
+The job titles hint is: "${ctx.jobTitles}".
+The deal size (${ctx.dealSize}) and sales cycle (${ctx.salesCycle}) indicate how complex the buying committee is.
+Competition context: "${ctx.competitors}" — infer what roles compare vendors.
+
+Return this exact JSON:
 {
   "title": "DMU Map",
   "roles": [
     {
       "role": "Economic Buyer",
-      "typicalTitles": ["2-3 titles"],
-      "concerns": ["2-3 primary concerns"],
-      "messagingAngle": "one sentence angle for this persona",
+      "typicalTitles": ["2-3 specific titles from the job titles context"],
+      "concerns": ["2-3 primary concerns: ROI, budget, risk"],
+      "messagingAngle": "one powerful sentence targeting this persona",
       "decisionWeight": "High/Medium/Low + brief reason"
     },
     {
       "role": "Champion",
-      "typicalTitles": [],
-      "concerns": [],
+      "typicalTitles": ["2-3 titles"],
+      "concerns": ["2-3 concerns"],
       "messagingAngle": "",
       "decisionWeight": ""
     },
     {
       "role": "Technical Buyer",
-      "typicalTitles": [],
-      "concerns": [],
+      "typicalTitles": ["2-3 titles"],
+      "concerns": ["2-3 concerns"],
       "messagingAngle": "",
       "decisionWeight": ""
     },
     {
       "role": "End User",
-      "typicalTitles": [],
-      "concerns": [],
+      "typicalTitles": ["2-3 titles"],
+      "concerns": ["2-3 concerns"],
       "messagingAngle": "",
       "decisionWeight": ""
     },
     {
       "role": "Influencer",
-      "typicalTitles": [],
-      "concerns": [],
+      "typicalTitles": ["2-3 titles"],
+      "concerns": ["2-3 concerns"],
       "messagingAngle": "",
       "decisionWeight": ""
     }
   ],
-  "buyingProcess": "2-3 sentence description of typical buying process",
-  "keyObjections": ["4-6 common objections with brief response hints"],
-  "summary": "2-3 sentence DMU summary in the response language",
-  "englishSummary": "2-3 sentence DMU summary always written in English regardless of response language"
+  "buyingProcess": "2-3 sentences describing the typical buying process for this deal size and sales cycle",
+  "keyObjections": ["5-7 specific objections based on competitors, deal size, and challenges context — each with a 1-sentence reframe"],
+  "summary": "2-3 sentence DMU summary in ${lang}",
+  "englishSummary": "2-3 sentence DMU summary always in English"
 }`;
 
-  const text = await callClaude(prompt);
-  return parseJson(text, "DMU");
+  return parseJson(await callClaude(prompt), "DMU");
 }
 
-async function generateAbm(context: OnboardingContext, lang: string, mode: string, now: Date) {
-  const prompt = `${buildContext(context, lang, mode, now)}
+// ── ABM ───────────────────────────────────────────────────────────────────────
 
-Generate the ABM (Account-Based Marketing) Strategy section. Return this exact JSON structure:
+async function generateAbm(ctx: OnboardingContext, lang: string, mode: string, now: Date) {
+  const prompt = `${buildContext(ctx, lang, mode, now)}
+
+Generate the ABM (Account-Based Marketing) Strategy.
+Tier 1 accounts should match: ${ctx.targetCompanySize} companies in ${ctx.industries} with buying triggers: ${ctx.buyingTriggers}.
+Monthly meetings target: ${ctx.meetingTarget} — use this to calibrate account counts per tier.
+Most important metric: ${ctx.mainMetric}.
+
+Return this exact JSON:
 {
   "title": "ABM Targeting Strategy",
   "tiers": [
     {
-      "tier": "Tier 1 - Strategic Accounts",
-      "criteria": ["4-5 specific criteria for top accounts"],
-      "accountCount": "estimated number e.g. 20-50",
-      "approach": "2-3 sentence personalized approach"
+      "tier": "Tier 1 — Strategic Accounts",
+      "criteria": ["4-5 specific criteria for top accounts matching the ICP perfectly"],
+      "accountCount": "realistic estimate based on geography + industry + size",
+      "approach": "2-3 sentences: hyper-personalized 1:1 ABM approach",
+      "channels": ["primary channels for this tier from outreach preferences"]
     },
     {
-      "tier": "Tier 2 - Growth Accounts",
-      "criteria": ["3-4 criteria"],
-      "accountCount": "estimated number e.g. 100-300",
-      "approach": "2-3 sentence scaled approach"
+      "tier": "Tier 2 — Growth Accounts",
+      "criteria": ["3-4 criteria: good fit but require nurturing"],
+      "accountCount": "realistic estimate",
+      "approach": "2-3 sentences: 1:few programmatic approach",
+      "channels": ["channels for tier 2"]
     },
     {
-      "tier": "Tier 3 - Pipeline Accounts",
-      "criteria": ["3-4 criteria"],
-      "accountCount": "estimated number e.g. 500-2000",
-      "approach": "2-3 sentence automated approach"
+      "tier": "Tier 3 — Pipeline Accounts",
+      "criteria": ["3-4 criteria: broad awareness"],
+      "accountCount": "realistic estimate",
+      "approach": "2-3 sentences: 1:many automated approach",
+      "channels": ["channels for tier 3"]
     }
   ],
-  "prioritizationFramework": "3-4 sentence framework for scoring and prioritizing accounts",
-  "kpis": ["5-7 KPIs to track ABM performance"],
-  "summary": "2-3 sentence ABM strategy summary in the response language",
-  "englishSummary": "2-3 sentence ABM strategy summary always written in English regardless of response language"
+  "prioritizationFramework": "3-4 sentences: how to score and rank accounts using ICP fit, buying triggers, and seasonal context",
+  "kpis": ["6-8 KPIs tied to the client's main metric (${ctx.mainMetric}) and sales targets"],
+  "seasonalPlay": "2-3 sentences: specific ABM actions to take right now given the current month/season",
+  "summary": "2-3 sentence ABM summary in ${lang}",
+  "englishSummary": "2-3 sentence ABM summary always in English"
 }`;
 
-  const text = await callClaude(prompt);
-  return parseJson(text, "ABM");
+  return parseJson(await callClaude(prompt), "ABM");
 }
 
-async function generateOutreach(context: OnboardingContext, lang: string, mode: string, now: Date) {
-  const prompt = `${buildContext(context, lang, mode, now)}
+// ── Outreach Playbook ─────────────────────────────────────────────────────────
 
-Generate the Outreach Playbook section. Keep templates concise (2-3 sentences each). Return this exact JSON structure:
+async function generateOutreach(ctx: OnboardingContext, lang: string, mode: string, now: Date) {
+  // Determine which channels are active
+  const channels: string[] = [];
+  const ch = (ctx.outreachChannels || "").toLowerCase();
+  const all = ch.includes("all");
+  if (all || ch.includes("cold-email") || ch.includes("email"))   channels.push("Email");
+  if (all || ch.includes("linkedin"))                             channels.push("LinkedIn");
+  if (all || ch.includes("whatsapp"))                             channels.push("WhatsApp");
+  if (all || ch.includes("cold-calls") || ch.includes("cold call")) channels.push("ColdCall");
+
+  // Override with explicit sequence preferences if set
+  if (ctx.wantsEmailSeq    && !channels.includes("Email"))    channels.push("Email");
+  if (ctx.wantsLinkedinSeq && !channels.includes("LinkedIn")) channels.push("LinkedIn");
+  if (ctx.wantsWhatsappSeq && !channels.includes("WhatsApp")) channels.push("WhatsApp");
+  if (ctx.wantsColdCall    && !channels.includes("ColdCall")) channels.push("ColdCall");
+
+  // If nothing selected, default to email + linkedin
+  if (channels.length === 0) channels.push("Email", "LinkedIn");
+
+  const tone = ctx.tone || "semi-formal";
+  const isArabic = ctx.outreachLang === "ar" || ctx.outreachLang === "both";
+  const hasEgypt = /egypt|eg\b/i.test(ctx.countries);
+  const hasGulf  = /saudi|uae|qatar|kuwait|sa\b|ae\b|qa\b|kw\b/i.test(ctx.countries);
+  const dialect  = isArabic
+    ? (hasEgypt ? "Egyptian Arabic (Egyptian colloquial dialect, not MSA)" : hasGulf ? "Gulf Arabic (Saudi/Emirati dialect)" : "Modern Standard Arabic")
+    : "English";
+
+  const coldCallBlock = channels.includes("ColdCall") ? `
+IMPORTANT — Cold Call script section:
+Generate a full Cold Call script following Jordan Belfort's Straight Line Sales System:
+  - Opening: Pattern-interrupt opener (short, confident, unexpected)
+  - Qualify: 3 key qualifying questions (intelligence-gathering, conversational)
+  - Pitch: Certainty stack — 3-part pitch building logical, emotional, and credibility certainty (product certain → company certain → salesperson certain)
+  - Objection loop: 2-3 reframe loops for the most common objections ("not interested", "send me info", "we have a solution already")
+  - Close: Appointment-setting close (confident, assumptive, with a specific day/time offer)
+Write the ENTIRE script in ${dialect}. The tone must be ${tone}.
+The value prop to use: "${ctx.valueProposition || ctx.description}".
+Target persona: "${ctx.jobTitles}".` : "";
+
+  const prompt = `${buildContext(ctx, lang, mode, now)}
+
+Generate the Outreach Playbook. Only generate sections for these channels: ${channels.join(", ")}.
+Message tone: ${tone}. All messages should be written in: ${dialect}.
+Value proposition to weave in: "${ctx.valueProposition || ctx.description}".
+Target personas: "${ctx.jobTitles}".
+Best result / social proof to reference: "${ctx.bestResult || ctx.notableClients}".
+${coldCallBlock}
+
+Return this exact JSON:
 {
   "title": "Outreach Playbook",
+  "dialect": "${dialect}",
+  "tone": "${tone}",
   "channels": [
-    {
-      "channel": "LinkedIn",
-      "strategy": "2-3 sentence LinkedIn approach",
-      "cadence": "e.g. Day 1, 3, 7, 14",
-      "messagingFramework": {
-        "hook": "attention-grabbing opener",
-        "value": "core value statement",
-        "cta": "low-friction call to action"
-      },
-      "templates": [
-        "Connection request template (150 chars max)",
-        "Follow-up message template (300 chars max)"
-      ]
-    },
-    {
+    ${channels.includes("Email") ? `{
       "channel": "Email",
-      "strategy": "2-3 sentence email approach",
-      "cadence": "e.g. Day 1, 4, 8, 15",
-      "messagingFramework": {
-        "hook": "subject line hook",
-        "value": "core value statement",
-        "cta": "low-friction CTA"
-      },
-      "templates": [
-        "Cold email template (150 words max)",
-        "Follow-up email template (100 words max)"
+      "strategy": "2-3 sentence email strategy tailored to the ICP and deal size",
+      "cadence": "Day 1, Day 4, Day 8, Day 15, Day 30",
+      "sequence": [
+        {
+          "day": 1,
+          "subject": "cold email subject line (pattern-interrupt)",
+          "body": "full cold email body in ${dialect} — personalised, value-first, 120-150 words, ends with soft CTA"
+        },
+        {
+          "day": 4,
+          "subject": "follow-up subject line",
+          "body": "follow-up email body — references email 1, adds new insight or proof point, 80-100 words"
+        },
+        {
+          "day": 8,
+          "subject": "break-up or value-add subject",
+          "body": "third touch — different angle, social proof or case study, soft or break-up tone, 60-80 words"
+        }
       ]
-    },
-    {
+    }` : ""}
+    ${channels.includes("Email") && channels.length > 1 ? "," : ""}
+    ${channels.includes("LinkedIn") ? `{
+      "channel": "LinkedIn",
+      "strategy": "2-3 sentence LinkedIn strategy",
+      "cadence": "Day 1 (connect), Day 3 (thank you + value), Day 7 (insight), Day 14 (follow-up)",
+      "sequence": [
+        {
+          "day": 1,
+          "type": "Connection Request",
+          "message": "connection request note in ${dialect} — max 200 chars, personalized hook referencing their work"
+        },
+        {
+          "day": 3,
+          "type": "First Message",
+          "message": "first message after connect — thank you, quick value insight, ends with question — max 300 chars in ${dialect}"
+        },
+        {
+          "day": 7,
+          "type": "Value Share",
+          "message": "share an insight or mini case study relevant to their pain — max 400 chars in ${dialect}"
+        },
+        {
+          "day": 14,
+          "type": "Soft Close",
+          "message": "meeting request or breakup message — assumptive and friendly — max 300 chars in ${dialect}"
+        }
+      ]
+    }` : ""}
+    ${channels.includes("LinkedIn") && (channels.includes("WhatsApp") || channels.includes("ColdCall")) ? "," : ""}
+    ${channels.includes("WhatsApp") ? `{
       "channel": "WhatsApp",
-      "strategy": "2-3 sentence WhatsApp approach",
-      "cadence": "e.g. After LinkedIn connect",
-      "messagingFramework": {
-        "hook": "conversation opener",
-        "value": "quick value statement",
-        "cta": "simple next step"
-      },
-      "templates": [
-        "WhatsApp intro message (100 chars max)"
+      "strategy": "2-3 sentence WhatsApp strategy — when and how to move from LinkedIn/email to WhatsApp",
+      "cadence": "Only after LinkedIn connection or email reply; Day 1, Day 5, Day 10",
+      "sequence": [
+        {
+          "day": 1,
+          "message": "WhatsApp intro — extremely short, friendly, references prior contact — max 120 chars in ${dialect}"
+        },
+        {
+          "day": 5,
+          "message": "WhatsApp follow-up — one-liner value hook with CTA — max 150 chars in ${dialect}"
+        },
+        {
+          "day": 10,
+          "message": "WhatsApp soft close or break-up — max 120 chars in ${dialect}"
+        }
       ]
-    }
+    }` : ""}
+    ${channels.includes("WhatsApp") && channels.includes("ColdCall") ? "," : ""}
+    ${channels.includes("ColdCall") ? `{
+      "channel": "ColdCall",
+      "strategy": "2-3 sentence cold calling strategy — time of day, number of attempts, voicemail approach",
+      "script": {
+        "opening": "Pattern-interrupt opening line in ${dialect} — short, confident, unexpected (2-3 sentences)",
+        "qualify": [
+          "Qualifying question 1 — intelligence-gathering, conversational in ${dialect}",
+          "Qualifying question 2 in ${dialect}",
+          "Qualifying question 3 in ${dialect}"
+        ],
+        "pitch": {
+          "logical": "Logical certainty — facts, results, numbers about the product in ${dialect}",
+          "emotional": "Emotional certainty — paint the picture of their life after using the product in ${dialect}",
+          "credibility": "Credibility certainty — social proof, company story, why we're the best at this in ${dialect}"
+        },
+        "objectionLoops": [
+          {
+            "objection": "Most common objection in ${dialect}",
+            "reframe": "Straight Line reframe — acknowledge, pivot, re-close in ${dialect}"
+          },
+          {
+            "objection": "Second most common objection in ${dialect}",
+            "reframe": "Reframe in ${dialect}"
+          },
+          {
+            "objection": "Third common objection in ${dialect}",
+            "reframe": "Reframe in ${dialect}"
+          }
+        ],
+        "close": "Assumptive appointment-setting close in ${dialect} — offer a specific day and time, then shut up"
+      }
+    }` : ""}
   ],
-  "sequenceOverview": "2-3 sentence multi-channel sequence overview",
-  "summary": "2-3 sentence outreach strategy summary in the response language",
-  "englishSummary": "2-3 sentence outreach strategy summary always written in English regardless of response language"
+  "sequenceOverview": "2-3 sentence multi-channel orchestration overview",
+  "summary": "2-3 sentence outreach playbook summary in ${lang}",
+  "englishSummary": "2-3 sentence outreach playbook summary always in English"
 }`;
 
-  const text = await callClaude(prompt);
-  return parseJson(text, "Outreach");
+  return parseJson(await callClaude(prompt, 6000), "Outreach");
 }
 
-async function generateLookalike(context: OnboardingContext, lang: string, mode: string, now: Date) {
-  const prompt = `${buildContext(context, lang, mode, now)}
+// ── Lookalike ─────────────────────────────────────────────────────────────────
 
-Generate the Lookalike Company Criteria section. NO specific company names or personal contacts. Return this exact JSON structure:
+async function generateLookalike(ctx: OnboardingContext, lang: string, mode: string, now: Date) {
+  const prompt = `${buildContext(ctx, lang, mode, now)}
+
+Generate the Lookalike Account Criteria section.
+Target market: ${ctx.industries} companies in ${ctx.countries} with ${ctx.targetCompanySize} employees.
+Buying triggers: ${ctx.buyingTriggers}.
+Job titles to reach: ${ctx.jobTitles}.
+
+For the recommendedCompanies table: identify 10 REAL companies that closely match this ICP.
+Use your knowledge of ${ctx.countries} and ${ctx.industries} markets to name real organisations.
+For each company provide: name, website domain, why they match (1 sentence), and a score 1-100 for each dimension.
+
+Return this exact JSON:
 {
   "title": "Lookalike Account Criteria",
   "criteria": [
     { "category": "Industry & Vertical", "criteria": ["3-4 criteria"], "rationale": "brief rationale" },
     { "category": "Company Size & Stage", "criteria": ["3-4 criteria"], "rationale": "brief rationale" },
-    { "category": "Tech Stack Signals", "criteria": ["3-4 criteria"], "rationale": "brief rationale" },
-    { "category": "Behavioral Signals", "criteria": ["3-4 criteria"], "rationale": "brief rationale" }
+    { "category": "Tech Stack Signals", "criteria": ["3-4 signals"], "rationale": "brief rationale" },
+    { "category": "Behavioral Signals", "criteria": ["3-4 signals"], "rationale": "brief rationale" },
+    { "category": "Buying Trigger Signals", "criteria": ["3-4 observable triggers"], "rationale": "brief rationale" }
   ],
   "searchQueries": {
     "linkedin": [
-      "LinkedIn Sales Navigator filter set 1",
+      "LinkedIn Sales Navigator filter set 1 — specific to the ICP",
       "LinkedIn Sales Navigator filter set 2"
     ],
     "google": [
-      "site:linkedin.com/company [industry] [size] [location]",
+      "Google search query 1 using site: and filetype: operators",
       "Google search query 2"
     ],
     "crunchbase": [
-      "Crunchbase filter description 1"
+      "Crunchbase filter set description"
     ]
   },
   "booleanStrings": [
-    "Boolean search string 1 for LinkedIn/Google",
-    "Boolean search string 2"
+    "(\"VP Sales\" OR \"Head of Sales\" OR \"Sales Director\") AND (\"SaaS\" OR \"software\") AND (\"Egypt\" OR \"Cairo\")",
+    "Boolean string 2 tailored to job titles and geography"
   ],
-  "summary": "2-3 sentence lookalike strategy summary in the response language",
-  "englishSummary": "2-3 sentence lookalike strategy summary always written in English regardless of response language",
-  "disclaimer": "These are search criteria only. No specific companies or personal contacts are provided. Use these criteria to build your own targeted account lists."
+  "recommendedCompanies": [
+    {
+      "company": "Real company name",
+      "website": "domain.com",
+      "industry": "their industry",
+      "whyTheyMatch": "1 sentence on why they match this ICP",
+      "scores": {
+        "industryFit": 85,
+        "sizeFit": 90,
+        "geographyFit": 95,
+        "triggerFit": 80,
+        "overall": 88
+      }
+    }
+  ],
+  "summary": "2-3 sentence lookalike strategy summary in ${lang}",
+  "englishSummary": "2-3 sentence lookalike strategy summary always in English",
+  "disclaimer": "Company suggestions are based on AI knowledge and should be verified before outreach. Use the search criteria above to build your own validated account list."
 }`;
 
-  const text = await callClaude(prompt);
-  return parseJson(text, "Lookalike");
+  return parseJson(await callClaude(prompt, 5000), "Lookalike");
 }
 
+// ── Success Probability ───────────────────────────────────────────────────────
+
+async function generateSuccessProbability(ctx: OnboardingContext, lang: string, mode: string, now: Date) {
+  const prompt = `${buildContext(ctx, lang, mode, now)}
+
+Generate a Campaign Success Probability analysis.
+Evaluate the probability of achieving the sales targets IF the GTM playbook is followed correctly.
+Base your probability estimates on:
+- ICP clarity (how well-defined the target is): job titles = "${ctx.jobTitles}", triggers = "${ctx.buyingTriggers}", disqualifiers = "${ctx.disqualifiers}"
+- Channel fit (how well chosen channels match the ICP): channels = "${ctx.outreachChannels}"
+- Deal complexity (deal size = "${ctx.dealSize}", sales cycle = "${ctx.salesCycle}")
+- Market conditions (countries = "${ctx.countries}", season, competition = "${ctx.competitors}")
+- Team readiness (has team = ${ctx.hasTeam}, tools = "${ctx.tools}")
+
+Return this exact JSON:
+{
+  "title": "Campaign Success Probability",
+  "overallProbability": 72,
+  "dimensions": [
+    { "name": "ICP Clarity", "score": 80, "rationale": "1 sentence explanation" },
+    { "name": "Channel-ICP Fit", "score": 70, "rationale": "1 sentence explanation" },
+    { "name": "Deal Complexity", "score": 65, "rationale": "1 sentence explanation — based on deal size and cycle" },
+    { "name": "Market Conditions", "score": 75, "rationale": "1 sentence: competition, seasonality, geography" },
+    { "name": "Team & Tool Readiness", "score": 60, "rationale": "1 sentence: team size, tools, current process" }
+  ],
+  "topRisks": ["3-4 specific risks that could reduce success rate"],
+  "topAccelerators": ["3-4 specific actions that would increase the probability"],
+  "projections": {
+    "pessimistic": { "meetingsPerMonth": 0, "dealsPerMonth": 0, "probabilityPct": 0 },
+    "realistic":   { "meetingsPerMonth": 0, "dealsPerMonth": 0, "probabilityPct": 0 },
+    "optimistic":  { "meetingsPerMonth": 0, "dealsPerMonth": 0, "probabilityPct": 0 }
+  },
+  "summary": "2-3 sentence probability assessment in ${lang}",
+  "englishSummary": "2-3 sentence assessment always in English"
+}`;
+
+  return parseJson(await callClaude(prompt), "SuccessProbability");
+}
+
+// ── Orchestrator ──────────────────────────────────────────────────────────────
+
 export async function generateReports(
-  context: OnboardingContext,
+  ctx: OnboardingContext,
   mode: "balanced" | "strict",
   now: Date = new Date()
 ) {
-  const lang = context.language === "ar" ? "Arabic" : "English";
+  const lang = ctx.language === "ar" ? "Arabic" : "English";
 
-  // Generate all 5 sections in parallel — each call is small enough to never truncate
-  const [icp, dmu, abm, outreach, lookalike] = await Promise.all([
-    generateIcp(context, lang, mode, now),
-    generateDmu(context, lang, mode, now),
-    generateAbm(context, lang, mode, now),
-    generateOutreach(context, lang, mode, now),
-    generateLookalike(context, lang, mode, now),
+  const [icp, dmu, abm, outreach, lookalike, successProbability] = await Promise.all([
+    generateIcp(ctx, lang, mode, now),
+    generateDmu(ctx, lang, mode, now),
+    generateAbm(ctx, lang, mode, now),
+    generateOutreach(ctx, lang, mode, now),
+    generateLookalike(ctx, lang, mode, now),
+    generateSuccessProbability(ctx, lang, mode, now),
   ]);
 
-  return { icp, dmu, abm, outreach, lookalike };
+  return { icp, dmu, abm, outreach, lookalike, successProbability };
 }
+
+// ── Follow-up questions (unchanged, kept for backward compat) ─────────────────
 
 export async function generateFollowUpQuestions(
   step: number,
@@ -490,15 +766,20 @@ export async function generateFollowUpQuestions(
   const lang = language === "ar" ? "Arabic" : "English";
 
   const stepNames: Record<number, string> = {
-    1: "Business Foundation (what you sell, problem, ICP hypothesis, target geos, pricing, sales cycle)",
-    2: "Real Customer Evidence (best customers, lost deals)",
-    3: "Value Proposition & Alternatives",
-    4: "ICP Constraints & Disqualifiers",
-    5: "DMU Roles",
-    6: "Channels & Current Process",
+    0: "Company Identity (name, size, revenue, LinkedIn)",
+    1: "Product / Service (type, pricing, deal size, sales cycle)",
+    2: "Current Sales Process (lead sources, tools, team)",
+    3: "Challenges (top pain points)",
+    4: "Target Market (countries, industries, company sizes)",
+    5: "ICP Hints (job titles, buying triggers, disqualifiers)",
+    6: "Sales Targets (meetings, deals, revenue target)",
+    7: "Success Stories (best results, notable clients)",
+    8: "Competition & Positioning (competitors, differentiation, value proposition)",
+    9: "Outreach Preferences (channels, language, tone, sequences)",
+    10: "Company Documents (pitch deck, brochure)",
   };
 
-  const prompt = `You are conducting a GTM strategy interview. The user is on step ${step}: ${stepNames[step]}.
+  const prompt = `You are conducting a GTM strategy interview. The user is on step ${step}: ${stepNames[step] ?? "Unknown step"}.
 
 Their current answers: ${JSON.stringify(existingAnswers)}
 

@@ -74,19 +74,20 @@ model OnboardingAnswer {
 }
 
 model GeneratedReport {
-  id             String   @id @default(cuid())
-  userId         String
-  language       String   @default("en")
-  icpJson        String?
-  dmuJson        String?
-  abmJson        String?
-  outreachJson   String?
-  lookalikeJson  String?
-  icpConfidence  Float    @default(0)
-  dmuConfidence  Float    @default(0)
-  strictPassed   Boolean  @default(false)
-  version        Int      @default(1)
-  createdAt      DateTime @default(now())
+  id                      String   @id @default(cuid())
+  userId                  String
+  language                String   @default("en")
+  icpJson                 String?
+  dmuJson                 String?
+  abmJson                 String?
+  outreachJson            String?
+  lookalikeJson           String?
+  successProbabilityJson  String?
+  icpConfidence           Float    @default(0)
+  dmuConfidence           Float    @default(0)
+  strictPassed            Boolean  @default(false)
+  version                 Int      @default(1)
+  createdAt               DateTime @default(now())
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   leadOrders LeadOrder[]

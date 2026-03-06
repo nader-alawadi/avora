@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { generateReports } from "@/lib/ai-engine";
-import {
-  calculateIcpConfidence,
-  calculateDmuConfidence,
-  checkStrictGate,
-} from "@/lib/confidence";
+import { generateReports, OnboardingContext } from "@/lib/ai-engine";
 import { createAuditLog } from "@/lib/audit";
 
 function getCurrentMonthKey(): string {
@@ -14,34 +9,42 @@ function getCurrentMonthKey(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Parse a JSON-encoded answer value back to an array, or return it as-is. */
+function parseArr(v: string | undefined): string {
+  if (!v) return "";
+  try {
+    const parsed = JSON.parse(v);
+    return Array.isArray(parsed) ? parsed.join(", ") : v;
+  } catch {
+    return v;
+  }
+}
+
+function bool(v: string | undefined): boolean {
+  if (!v) return false;
+  return v === "yes" || v === "true" || v === "1";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await requireAuth();
     const { language, forceMode } = await req.json();
 
-    // --- Regenerate credit check ---
+    // ── Regenerate credit check ──────────────────────────────────────────────
     const user = await prisma.user.findUniqueOrThrow({ where: { id: session.id } });
     const currentMonth = getCurrentMonthKey();
-
-    // Reset monthly counter if it's a new month
     const needsReset = user.regenerateResetMonth !== currentMonth;
     const monthlyUsed = needsReset ? 0 : user.monthlyRegenerateUsed;
 
-    // Determine if user has a free regenerate available
-    // Free monthly slot: monthlyUsed === 0
-    // Extra admin-granted credits: extraRegenerateCredits > 0
     const hasFreeMonthly = monthlyUsed === 0;
     const hasExtraCredit = user.extraRegenerateCredits > 0;
     const canRegenerate = hasFreeMonthly || hasExtraCredit;
 
     if (!canRegenerate) {
-      return NextResponse.json(
-        { error: "REGEN_CREDIT_REQUIRED" },
-        { status: 402 }
-      );
+      return NextResponse.json({ error: "REGEN_CREDIT_REQUIRED" }, { status: 402 });
     }
 
-    // Consume credit (extra credits first, then monthly slot)
+    // Consume credit (extra first, then monthly slot)
     if (hasExtraCredit && !hasFreeMonthly) {
       await prisma.user.update({
         where: { id: session.id },
@@ -51,7 +54,6 @@ export async function POST(req: NextRequest) {
         },
       });
     } else {
-      // Using the free monthly slot
       await prisma.user.update({
         where: { id: session.id },
         data: {
@@ -61,75 +63,121 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // --- Fetch onboarding data ---
-    const answers = await prisma.onboardingAnswer.findMany({
+    // ── Fetch onboarding answers ─────────────────────────────────────────────
+    const rawAnswers = await prisma.onboardingAnswer.findMany({
       where: { userId: session.id },
     });
 
-    const profile = await prisma.companyProfile.findUnique({
-      where: { userId: session.id },
-    });
-
+    // Group by step
     const grouped: Record<number, Record<string, string>> = {};
-    for (const a of answers) {
+    for (const a of rawAnswers) {
       if (!grouped[a.step]) grouped[a.step] = {};
       grouped[a.step][a.key] = a.value;
     }
 
-    const s1 = grouped[1] || {};
-    const s2 = grouped[2] || {};
-    const s3 = grouped[3] || {};
-    const s4 = grouped[4] || {};
-    const s5 = grouped[5] || {};
-    const s6 = grouped[6] || {};
+    // New 12-step wizard: steps 0-11
+    const s0  = grouped[0]  ?? {};  // Company Identity
+    const s1  = grouped[1]  ?? {};  // What You Sell
+    const s2  = grouped[2]  ?? {};  // Current Sales Process
+    const s3  = grouped[3]  ?? {};  // Challenges
+    const s4  = grouped[4]  ?? {};  // Target Market
+    const s5  = grouped[5]  ?? {};  // ICP Hints
+    const s6  = grouped[6]  ?? {};  // Sales Targets
+    const s7  = grouped[7]  ?? {};  // Success Stories
+    const s8  = grouped[8]  ?? {};  // Competition & Positioning
+    const s9  = grouped[9]  ?? {};  // Outreach Preferences
+    const s10 = grouped[10] ?? {};  // Company Documents
 
-    const icpConfidence = calculateIcpConfidence({ step1: s1, step2: s2, step3: s3, step4: s4 });
-    const dmuConfidence = calculateDmuConfidence({ step5: s5 });
-    const strictGate = checkStrictGate(icpConfidence, dmuConfidence, {
-      step1: s1,
-      step2: s2,
-      step4: s4,
-      step5: s5,
-    });
+    // Also check old step keys for backward compatibility (steps 1-6 from old wizard)
+    const sOld1 = grouped[1]  ?? {};
+    const sOld5 = grouped[5]  ?? {};
+    const sOld6 = grouped[6]  ?? {};
 
-    const mode = strictGate.passed ? "strict" : "balanced";
+    // ── Build OnboardingContext ───────────────────────────────────────────────
 
-    const context = {
-      language: language || session.language || "en",
-      companyName: profile?.companyName || "",
-      industry: profile?.industry || "",
-      employeeRange: profile?.employeeRange || "",
-      revenueRange: profile?.revenueRange || "",
-      offer: s1.offer || "",
-      problem: s1.problem || "",
-      pricingRange: s1.pricingRange || "",
-      salesCycleRange: s1.salesCycleRange || "",
-      geoTargets: s1.geoTargets || "",
-      icpHypothesis: s1.icpHypothesis || "",
-      bestCustomer1: s2.bestCustomer1 || "",
-      bestCustomer2: s2.bestCustomer2 || "",
-      lostDeal: s2.lostDeal || "",
-      whyWeWin: s3.whyWeWin || "",
-      competitors: s3.competitors || "",
-      differentiation: s3.differentiation || "",
-      disqualifiers: s4.disqualifiers || "",
-      economicBuyer: s5.economicBuyer || "",
-      champion: s5.champion || "",
-      technicalBuyer: s5.technicalBuyer || "",
-      endUser: s5.endUser || "",
-      influencer: s5.influencer || "",
-      objections: s5.objections || "",
-      titles: s5.titles || "",
-      currentChannels: s6.currentChannels || "",
-      teamSize: s6.teamSize || "",
-      tools: s6.tools || "",
-      capacity: s6.capacity || "",
+    const ctx: OnboardingContext = {
+      language: language || session.language || "ar",
+
+      // Step 0 — Company Identity
+      companyName:   s0.companyName  || sOld1.offer?.split(" ")[0] || "",
+      website:       s0.website      || "",
+      employees:     s0.employees    || "",
+      annualRevenue: s0.revenue      || "",
+      linkedin:      s0.linkedin     || "",
+      logoUrl:       s0.logoUrl      || "",
+
+      // Step 1 — What You Sell
+      productName:  s1.productName  || sOld1.offer || "",
+      productType:  s1.type         || "",
+      description:  s1.description  || sOld1.problem || "",
+      pricingModel: s1.pricing      || sOld1.pricingRange || "",
+      dealSize:     s1.dealSize     || "",
+      salesCycle:   s1.salesCycle   || sOld1.salesCycleRange || "",
+
+      // Step 2 — Current Sales Process
+      leadSources: parseArr(s2.leadSources) || sOld6.currentChannels || "",
+      tools:       parseArr(s2.tools)       || sOld6.tools           || "",
+      hasTeam:     bool(s2.hasTeam),
+      teamSize:    s2.teamSize || sOld6.teamSize || "",
+      roles:       parseArr(s2.roles)       || "",
+
+      // Step 3 — Challenges
+      topChallenges: parseArr(s3.challenges) || "",
+      biggestPain:   s3.biggestPain || "",
+
+      // Step 4 — Target Market
+      countries:          parseArr(s4.countries)    || sOld1.geoTargets   || "",
+      industries:         parseArr(s4.industries)   || "",
+      targetCompanySize:  parseArr(s4.companySize)  || "",
+      b2bOrB2c:           s4.b2b || "b2b",
+
+      // Step 5 — ICP Hints
+      jobTitles:     s5.jobTitles   || sOld5.titles || "",
+      buyingTriggers: parseArr(s5.triggers) || "",
+      disqualifiers:  s5.disqualifiers || sOld5.disqualifiers || "",
+
+      // Step 6 — Sales Targets
+      meetingTarget: s6.meetingTarget || "",
+      dealsTarget:   s6.dealsTarget   || "",
+      revenueTarget: s6.revenueTarget || "",
+      mainMetric:    s6.mainMetric    || "",
+
+      // Step 7 — Success Stories
+      successFiles:    s7.successFiles    || "",
+      bestResult:      s7.bestResult      || "",
+      notableClients:  s7.notableClients  || "",
+
+      // Step 8 — Competition & Positioning
+      competitors:       s8.competitors       || sOld1.competitors    || "",
+      differentiation:   s8.differentiation   || sOld1.differentiation || "",
+      valueProposition:  s8.valueProposition  || sOld1.whyWeWin       || "",
+
+      // Step 9 — Outreach Preferences
+      outreachChannels:   parseArr(s9.channels)  || sOld6.currentChannels || "",
+      outreachLang:       s9.outreachLang        || (language === "ar" ? "ar" : "en"),
+      tone:               s9.tone               || "semi-formal",
+      wantsColdCall:      bool(s9.coldCall),
+      wantsEmailSeq:      bool(s9.emailSeq),
+      wantsLinkedinSeq:   bool(s9.linkedinSeq),
+      wantsWhatsappSeq:   bool(s9.whatsappSeq),
+
+      // Step 10 — Company Documents
+      profileFiles:   s10.profileFiles  || "",
+      brochureFiles:  s10.brochureFiles || "",
     };
 
-    const now = new Date();
-    const reports = await generateReports(context, mode, now);
+    // ── Confidence scoring ───────────────────────────────────────────────────
+    // Score based on how much data was provided across the new steps
+    const icpScore = scoreIcp(ctx);
+    const dmuScore = scoreDmu(ctx);
+    const mode = forceMode || (icpScore >= 70 && dmuScore >= 70 ? "strict" : "balanced");
+    const strictPassed = icpScore >= 70 && dmuScore >= 70;
 
-    // Get latest version
+    // ── Generate reports ─────────────────────────────────────────────────────
+    const now = new Date();
+    const reports = await generateReports(ctx, mode, now);
+
+    // ── Persist ──────────────────────────────────────────────────────────────
     const latestReport = await prisma.generatedReport.findFirst({
       where: { userId: session.id },
       orderBy: { version: "desc" },
@@ -138,25 +186,26 @@ export async function POST(req: NextRequest) {
 
     const report = await prisma.generatedReport.create({
       data: {
-        userId: session.id,
-        language: context.language,
-        icpJson: JSON.stringify(reports.icp),
-        dmuJson: JSON.stringify(reports.dmu),
-        abmJson: JSON.stringify(reports.abm),
-        outreachJson: JSON.stringify(reports.outreach),
-        lookalikeJson: JSON.stringify(reports.lookalike),
-        icpConfidence,
-        dmuConfidence,
-        strictPassed: strictGate.passed,
-        version: newVersion,
+        userId:                 session.id,
+        language:               ctx.language,
+        icpJson:                JSON.stringify(reports.icp),
+        dmuJson:                JSON.stringify(reports.dmu),
+        abmJson:                JSON.stringify(reports.abm),
+        outreachJson:           JSON.stringify(reports.outreach),
+        lookalikeJson:          JSON.stringify(reports.lookalike),
+        successProbabilityJson: JSON.stringify(reports.successProbability),
+        icpConfidence:          icpScore,
+        dmuConfidence:          dmuScore,
+        strictPassed,
+        version:                newVersion,
       },
     });
 
     await createAuditLog(session.id, "REPORT_GENERATED", "GeneratedReport", report.id, {
-      version: newVersion,
-      icpConfidence,
-      dmuConfidence,
-      strictPassed: strictGate.passed,
+      version:         newVersion,
+      icpConfidence:   icpScore,
+      dmuConfidence:   dmuScore,
+      strictPassed,
       usedFreeMonthly: hasFreeMonthly,
       usedExtraCredit: hasExtraCredit && !hasFreeMonthly,
     });
@@ -164,19 +213,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       report: {
         id: report.id,
-        icpConfidence,
-        dmuConfidence,
-        strictPassed: strictGate.passed,
-        missingItems: strictGate.missing,
+        icpConfidence: icpScore,
+        dmuConfidence: dmuScore,
+        strictPassed,
         mode,
         version: newVersion,
       },
     });
   } catch (error) {
     console.error("Report generation error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate report" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to generate report" }, { status: 500 });
   }
+}
+
+// ── Confidence scoring helpers ────────────────────────────────────────────────
+// These replace the old step-specific confidence functions and work directly
+// on the flattened OnboardingContext.
+
+function filled(s: string | undefined, minLen = 3): boolean {
+  return (s ?? "").trim().length >= minLen;
+}
+
+function scoreIcp(ctx: OnboardingContext): number {
+  let score = 0;
+  if (filled(ctx.productName, 3))      score += 10;
+  if (filled(ctx.description, 20))     score += 15;
+  if (filled(ctx.pricingModel, 3))     score += 8;
+  if (filled(ctx.salesCycle, 3))       score += 8;
+  if (filled(ctx.countries, 2))        score += 8;
+  if (filled(ctx.industries, 3))       score += 8;
+  if (filled(ctx.targetCompanySize, 2)) score += 5;
+  if (filled(ctx.jobTitles, 5))        score += 12;
+  if (filled(ctx.buyingTriggers, 3))   score += 8;
+  if (filled(ctx.disqualifiers, 10))   score += 10;
+  if (filled(ctx.biggestPain, 10))     score += 5;
+  if (filled(ctx.valueProposition, 10)) score += 3;
+  return Math.min(100, score);
+}
+
+function scoreDmu(ctx: OnboardingContext): number {
+  let score = 0;
+  if (filled(ctx.jobTitles, 5))        score += 30;
+  if (filled(ctx.competitors, 5))      score += 15;
+  if (filled(ctx.differentiation, 10)) score += 15;
+  if (filled(ctx.valueProposition, 10)) score += 20;
+  if (filled(ctx.topChallenges, 3))    score += 10;
+  if (filled(ctx.biggestPain, 10))     score += 10;
+  return Math.min(100, score);
 }
