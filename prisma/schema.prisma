@@ -1,0 +1,367 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id              String    @id @default(cuid())
+  name            String?
+  email           String    @unique
+  password        String
+  plan            String    @default("LITE")
+  language        String    @default("en")
+  timezone        String    @default("UTC")
+  pdfExportsUsed          Int       @default(0)
+  isAdmin                 Boolean   @default(false)
+  monthlyRegenerateUsed   Int       @default(0)
+  regenerateResetMonth    String    @default("")
+  extraRegenerateCredits  Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  companyProfile    CompanyProfile?
+  onboardingAnswers OnboardingAnswer[]
+  generatedReports  GeneratedReport[]
+  leadOrders        LeadOrder[]
+  payments          Payment[]
+  exportPacks       ExportPack[]
+  auditLogs         AuditLog[]
+  crmLeads          CrmLead[]
+  teamMembers       TeamMember[]
+  leadDisputes      LeadDispute[]
+
+  @@map("users")
+}
+
+model CompanyProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  companyName     String?
+  websiteUrl      String?
+  industry        String?
+  geoTargets      String?
+  employeeRange   String?
+  revenueRange    String?
+  offer           String?
+  problem         String?
+  pricingRange    String?
+  salesCycleRange String?
+  toolsStack      String?
+  notes           String?
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+model OnboardingAnswer {
+  id        String   @id @default(cuid())
+  userId    String
+  step      Int
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, step, key])
+  @@map("onboarding_answers")
+}
+
+model GeneratedReport {
+  id                      String   @id @default(cuid())
+  userId                  String
+  language                String   @default("en")
+  icpJson                 String?
+  dmuJson                 String?
+  abmJson                 String?
+  outreachJson            String?
+  lookalikeJson           String?
+  successProbabilityJson  String?
+  icpConfidence           Float    @default(0)
+  dmuConfidence           Float    @default(0)
+  strictPassed            Boolean  @default(false)
+  version                 Int      @default(1)
+  createdAt               DateTime @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadOrders LeadOrder[]
+
+  @@map("generated_reports")
+}
+
+model LeadOrder {
+  id                      String   @id @default(cuid())
+  userId                  String
+  reportId                String?
+  leadCountMonthly        Int
+  pricePerLead            Float
+  totalPriceUsd           Float
+  status                  String   @default("Draft")
+  deliverySlaBusinessDays Int      @default(7)
+  adminNotes              String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report         GeneratedReport?  @relation(fields: [reportId], references: [id])
+  payments       Payment[]
+  deliveredLeads DeliveredLead[]
+
+  @@map("lead_orders")
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  userId      String
+  orderId     String?
+  type        String
+  provider    String   @default("PAYONEER")
+  invoiceLink String?
+  reference   String?
+  status      String   @default("Pending")
+  amountUsd   Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order LeadOrder?  @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model ExportPack {
+  id        String   @id @default(cuid())
+  userId    String
+  credits   Int      @default(50)
+  priceUsd  Float    @default(100)
+  status    String   @default("Pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("export_packs")
+}
+
+model DeliveredLead {
+  id                     String    @id @default(cuid())
+  orderId                String
+  contactId              String?
+  fullName               String?
+  roleTitle              String?
+  linkedinUrl            String?
+  email                  String?
+  phone                  String?
+  personalityType        String?
+  personalityAnalysisUrl String?
+  companyId              String?
+  brandName              String?
+  notes                  String?
+  country                String?
+  techStacks             String?
+  seniorityLevel         String?
+  buyingRole             String?
+  preferredChannel       String?
+  isPrimaryContact       Boolean   @default(false)
+  whatsappAvailable      Boolean   @default(false)
+  deliveryBatch          String?
+  deliveryDate           DateTime?
+  status                 String    @default("Delivered") // "Staged" | "Delivered" | "Disputed"
+  disputeReason          String?
+  disputeDetails         String?
+  disputeFileUrl         String?
+  createdAt              DateTime  @default(now())
+
+  deliveredByAdminId String?
+  deliveredByAdmin   AdminTeamMember? @relation("DeliveredByAdmin", fields: [deliveredByAdminId], references: [id], onDelete: SetNull)
+
+  order   LeadOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  crmLead CrmLead?
+
+  @@map("delivered_leads")
+}
+
+model CrmLead {
+  id                     String       @id @default(cuid())
+  userId                 String
+  deliveredLeadId        String?      @unique
+  fullName               String?
+  roleTitle              String?
+  company                String?
+  linkedinUrl            String?
+  email                  String?
+  phone                  String?
+  personalityType        String?
+  personalityAnalysisUrl String?
+  buyingRole             String?
+  preferredChannel       String?
+  seniorityLevel         String?
+  country                String?
+  techStacks             String?
+  whatsappAvailable      Boolean      @default(false)
+  stage                  String       @default("NewLead")
+  notes                  String?
+  nextFollowUp           DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveredLead DeliveredLead? @relation(fields: [deliveredLeadId], references: [id])
+  activities    CrmActivity[]
+  disputes      LeadDispute[]
+
+  @@map("crm_leads")
+}
+
+model CrmActivity {
+  id          String   @id @default(cuid())
+  crmLeadId   String
+  type        String
+  description String
+  createdAt   DateTime @default(now())
+
+  crmLead CrmLead @relation(fields: [crmLeadId], references: [id], onDelete: Cascade)
+
+  @@map("crm_activities")
+}
+
+// ── Team access models ────────────────────────────────────────
+
+// Internal Enigma Sales team members who work inside the Admin panel
+model AdminTeamMember {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
+  password          String?                     // null until invite accepted
+  adminRole         String                      // "SuperAdmin" | "AccountManager" | "LeadResearcher"
+  assignedClientIds String    @default("[]")    // JSON array of User.id values
+  status            String    @default("Pending") // "Pending" | "Active"
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
+  lastActive        DateTime?
+  // HR fields
+  jobTitle          String?
+  avatarUrl         String?
+  phone             String?
+  nationalId        String?
+  bankAccount       String?
+  eWallet           String?
+  baseSalary        Float?
+  dailyLeadTarget   Int       @default(10)
+  bonusBalance      Float     @default(0)       // cached; derived from deliveredLeads & withdrawals
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  attendanceLogs     AttendanceLog[]
+  bonusTransactions  BonusTransaction[]
+  withdrawalRequests WithdrawalRequest[]
+  deliveredLeads     DeliveredLead[]     @relation("DeliveredByAdmin")
+
+  @@map("admin_team_members")
+}
+
+// Sub-users inside a client's workspace (same business domain)
+model TeamMember {
+  id                String    @id @default(cuid())
+  workspaceOwnerId  String
+  email             String
+  name              String?
+  password          String?                     // null until invite accepted
+  role              String                      // "Admin" | "SalesRep" | "Viewer"
+  status            String    @default("Pending") // "Pending" | "Active" | "Revoked"
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
+  lastActive        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  workspaceOwner User @relation(fields: [workspaceOwnerId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceOwnerId, email])
+  @@map("team_members")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  details   String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model LeadDispute {
+  id        String   @id @default(cuid())
+  crmLeadId String?              // nullable: set to null when CrmLead is deleted on accept
+  userId    String
+  reason    String
+  details   String?
+  fileUrl   String?
+  status    String   @default("Pending")  // "Pending" | "Accepted" | "Rejected"
+  adminNote String?
+  leadName  String?  // snapshot of CrmLead.fullName at dispute creation time
+  leadTitle String?  // snapshot of CrmLead.roleTitle at dispute creation time
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  crmLead CrmLead? @relation(fields: [crmLeadId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("lead_disputes")
+}
+
+model AttendanceLog {
+  id                String    @id @default(cuid())
+  adminTeamMemberId String
+  date              String    // YYYY-MM-DD (UTC)
+  checkInTime       DateTime?
+  checkOutTime      DateTime?
+  hoursWorked       Float?
+  status            String    @default("Absent") // Present | Late | Absent
+  createdAt         DateTime  @default(now())
+
+  adminTeamMember AdminTeamMember @relation(fields: [adminTeamMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([adminTeamMemberId, date])
+  @@map("attendance_logs")
+}
+
+model BonusTransaction {
+  id                String   @id @default(cuid())
+  adminTeamMemberId String
+  type              String   // Qualified | Rejected | Withdrawal
+  amount            Float
+  leadId            String?
+  description       String?
+  createdAt         DateTime @default(now())
+
+  adminTeamMember AdminTeamMember @relation(fields: [adminTeamMemberId], references: [id], onDelete: Cascade)
+
+  @@map("bonus_transactions")
+}
+
+model WithdrawalRequest {
+  id                String   @id @default(cuid())
+  adminTeamMemberId String
+  amount            Float
+  accountDetails    String
+  status            String   @default("Pending") // Pending | Approved | Rejected
+  adminNote         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  adminTeamMember AdminTeamMember @relation(fields: [adminTeamMemberId], references: [id], onDelete: Cascade)
+
+  @@map("withdrawal_requests")
+}
