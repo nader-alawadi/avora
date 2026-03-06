@@ -71,7 +71,7 @@ export async function GET() {
 
     // Enrich each active member with performance + attendance data
     const employees = await Promise.all(
-      activeMembers.map(async (member) => {
+      activeMembers.map(async (member: any) => {
         const [thisMonthLeads, allTimeLeads, approvedWithdrawals, attendanceLogs] =
           await Promise.all([
             // This month delivered leads (excl. Staged)
