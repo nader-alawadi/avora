@@ -385,6 +385,18 @@ async function aiGenerate(
   return d.text;
 }
 
+function aiErrorMessage(err: unknown, lang: Lang): string {
+  const msg = err instanceof Error ? err.message : "";
+  if (msg === "AI_NOT_CONFIGURED") {
+    return lang === "ar"
+      ? "خدمة الذكاء الاصطناعي غير مُهيأة. يرجى التواصل مع الدعم الفني."
+      : "AI service is not configured. Please contact support.";
+  }
+  return lang === "ar"
+    ? "فشل التوليد. يرجى المحاولة مرة أخرى."
+    : "Generation failed. Please try again.";
+}
+
 // ── Animated Progress Bar ──────────────────────────────────────────────────────
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
@@ -673,10 +685,7 @@ export default function OnboardingWizard() {
       setFn(text);
     } catch (err) {
       console.error("[handleAI] error for field:", field, err);
-      const msg = lang === "ar"
-        ? "فشل التوليد. تأكد من إدخال معلومات الشركة في الخطوات السابقة ثم حاول مرة أخرى."
-        : "Generation failed. Make sure you've filled in company details in earlier steps, then try again.";
-      setAiError(msg);
+      setAiError(aiErrorMessage(err, lang));
       // Auto-clear after 5 seconds
       setTimeout(() => setAiError(""), 5000);
     } finally {

@@ -2,11 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic();
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
+const AI_CONFIGURED =
+  ANTHROPIC_API_KEY.length > 0 &&
+  !ANTHROPIC_API_KEY.startsWith("your-") &&
+  !ANTHROPIC_API_KEY.startsWith("sk-ant-placeholder");
+
+const client = AI_CONFIGURED ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
 
 export async function POST(req: NextRequest) {
   try { await requireAuth(); } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!AI_CONFIGURED || !client) {
+    console.error("[ai-generate] ANTHROPIC_API_KEY is missing or is a placeholder");
+    return NextResponse.json(
+      { error: "AI_NOT_CONFIGURED" },
+      { status: 503 }
+    );
   }
 
   const { field, context, lang } = await req.json();
@@ -66,7 +80,12 @@ export async function POST(req: NextRequest) {
     const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
     console.log(`[ai-generate] field=${field} text_len=${text.length}`);
     return NextResponse.json({ text });
-  } catch (err) {
+  } catch (err: unknown) {
+    const status = (err as { status?: number })?.status;
+    if (status === 401 || status === 403) {
+      console.error("[ai-generate] Anthropic auth error — check ANTHROPIC_API_KEY");
+      return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
+    }
     console.error("[ai-generate] Anthropic error:", err);
     return NextResponse.json({ error: "AI generation failed" }, { status: 500 });
   }
