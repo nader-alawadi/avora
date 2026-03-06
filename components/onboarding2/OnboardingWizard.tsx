@@ -381,7 +381,8 @@ async function aiGenerate(
     body: JSON.stringify({ field, context, lang }),
   });
   const d = await res.json();
-  return d.text ?? "";
+  if (!res.ok || !d.text) throw new Error(d.error || "Empty response from AI");
+  return d.text;
 }
 
 // ── Animated Progress Bar ──────────────────────────────────────────────────────
@@ -560,6 +561,7 @@ export default function OnboardingWizard() {
   const [s11ProfileFiles, setS11ProfileFiles] = useState<UploadedFile[]>([]);
   const [s11BrochureFiles, setS11BrochureFiles] = useState<UploadedFile[]>([]);
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [aiError, setAiError] = useState("");
   const savingRef = useRef(false);
 
   const t = T[lang];
@@ -665,11 +667,18 @@ export default function OnboardingWizard() {
 
   const handleAI = async (field: string, setFn: (v: string) => void) => {
     setAiLoading((p) => ({ ...p, [field]: true }));
+    setAiError("");
     try {
       const text = await aiGenerate(field, buildContext(), lang);
-      if (text) setFn(text);
+      setFn(text);
     } catch (err) {
       console.error("[handleAI] error for field:", field, err);
+      const msg = lang === "ar"
+        ? "فشل التوليد. تأكد من إدخال معلومات الشركة في الخطوات السابقة ثم حاول مرة أخرى."
+        : "Generation failed. Make sure you've filled in company details in earlier steps, then try again.";
+      setAiError(msg);
+      // Auto-clear after 5 seconds
+      setTimeout(() => setAiError(""), 5000);
     } finally {
       setAiLoading((p) => ({ ...p, [field]: false }));
     }
@@ -1582,6 +1591,16 @@ export default function OnboardingWizard() {
             <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
               {stepContent()}
             </div>
+
+            {aiError && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center"
+              >
+                {aiError}
+              </motion.div>
+            )}
 
             {/* Navigation */}
             <div
