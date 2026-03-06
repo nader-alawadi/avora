@@ -30,5 +30,5 @@
     Coral dot — same position as dark variant.
     The dot ALWAYS stays #FF5252 regardless of logo color variant.
   -->
-  <circle cx="70" cy="27" r="6" fill="#FF5252"/>
+  <circle cx="69" cy="26" r="6" fill="#FF5252"/>
 </svg>

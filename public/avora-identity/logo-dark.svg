@@ -35,5 +35,5 @@
     x-height ≈ 30px → center_y = 42 − 15 = 27
     Inner counter radius ≈ 8px → safe dot radius = 6
   -->
-  <circle cx="70" cy="27" r="6" fill="#FF5252"/>
+  <circle cx="69" cy="26" r="6" fill="#FF5252"/>
 </svg>
