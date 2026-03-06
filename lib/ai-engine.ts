@@ -643,7 +643,7 @@ Return this exact JSON:
 // ── Lookalike ─────────────────────────────────────────────────────────────────
 
 async function generateLookalike(ctx: OnboardingContext, lang: string, mode: string, now: Date) {
-  const LOOKALIKE_MODEL = "claude-sonnet-4-5-20251001";
+  const LOOKALIKE_MODEL = "claude-sonnet-4-6";
 
   // ── Call 1: Criteria, search queries, and boolean strings ─────────────────
   const criteriaPrompt = `${buildContext(ctx, lang, mode, now)}
