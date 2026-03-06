@@ -1,6 +1,11 @@
 import { requireAnthropicClient } from "@/lib/anthropic-client";
+import type Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = requireAnthropicClient();
+let _anthropic: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_anthropic) _anthropic = requireAnthropicClient();
+  return _anthropic;
+}
 
 // ── Context interface ─────────────────────────────────────────────────────────
 // Maps all 12 wizard steps into a single flat context object.
@@ -280,7 +285,7 @@ Use the Seasonal Intelligence above to enrich ALL report sections:
 // ── Claude API call ───────────────────────────────────────────────────────────
 
 async function callClaude(prompt: string, maxTokens = 4096, model = "claude-sonnet-4-6"): Promise<string> {
-  const response = await anthropic.messages.create({
+  const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
     system: SYSTEM_PROMPT,
@@ -843,7 +848,7 @@ Generate 2-3 specific follow-up questions in ${lang} to deepen the analysis.
 Focus on gaps or areas needing more specificity.
 Return ONLY a JSON array of question strings.`;
 
-  const response = await anthropic.messages.create({
+  const response = await getClient().messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 500,
     messages: [{ role: "user", content: prompt }],
