@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { EmployeeDashboard } from "@/components/employee/EmployeeDashboard";
 import Link from "next/link";
@@ -75,7 +75,7 @@ const TABS_BY_TEAM_ROLE: Record<string, string[]> = {
   Viewer:  ["icp", "dmu", "abm", "outreach", "lookalike", "crm"],
 };
 
-export default function DashboardPage() {
+function DashboardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
@@ -424,5 +424,13 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense>
+      <DashboardInner />
+    </Suspense>
   );
 }

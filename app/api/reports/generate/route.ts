@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     // ── Confidence scoring ───────────────────────────────────────────────────
     const icpScore = scoreIcp(ctx);
     const dmuScore = scoreDmu(ctx);
-    const mode = forceMode || (icpScore >= 70 && dmuScore >= 70 ? "strict" : "balanced");
+    const mode = (forceMode || (icpScore >= 70 && dmuScore >= 70 ? "strict" : "balanced")) as "strict" | "balanced";
     const strictPassed = icpScore >= 70 && dmuScore >= 70;
 
     // ── Full context debug log ───────────────────────────────────────────────
