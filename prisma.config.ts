@@ -9,8 +9,10 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    // Fallback matches the default in lib/prisma.ts so CLI commands work
-    // even when .env is not explicitly loaded (Prisma 7 reads this at runtime).
-    url: process.env["DATABASE_URL"] ?? "file:./prisma/dev.db",
+    // For local dev: file:./prisma/dev.db (no auth needed)
+    // For Turso: libsql://... — TURSO_AUTH_TOKEN env var is read automatically by libsql
+    url:
+      process.env["DATABASE_URL"] ??
+      "libsql://avora-db-nader-alawadi.aws-eu-west-1.turso.io",
   },
 });
