@@ -28,7 +28,17 @@ function bool(v: string | undefined): boolean {
 export async function POST(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const { language, forceMode } = await req.json();
+
+    // req.json() throws on empty body — handle gracefully
+    let language: string | undefined;
+    let forceMode: string | undefined;
+    try {
+      const body = await req.json();
+      language = body.language;
+      forceMode = body.forceMode;
+    } catch {
+      // body was empty or not JSON — use session defaults
+    }
 
     // ── Regenerate credit check ──────────────────────────────────────────────
     const user = await prisma.user.findUniqueOrThrow({ where: { id: session.id } });
@@ -167,11 +177,21 @@ export async function POST(req: NextRequest) {
     };
 
     // ── Confidence scoring ───────────────────────────────────────────────────
-    // Score based on how much data was provided across the new steps
     const icpScore = scoreIcp(ctx);
     const dmuScore = scoreDmu(ctx);
     const mode = forceMode || (icpScore >= 70 && dmuScore >= 70 ? "strict" : "balanced");
     const strictPassed = icpScore >= 70 && dmuScore >= 70;
+
+    // ── Full context debug log ───────────────────────────────────────────────
+    console.log("=".repeat(60));
+    console.log("[generate] RAW DB answers by step:");
+    for (const [stepNum, kvs] of Object.entries(grouped)) {
+      console.log(`  Step ${stepNum}:`, JSON.stringify(kvs));
+    }
+    console.log("[generate] OnboardingContext sent to AI:");
+    console.log(JSON.stringify(ctx, null, 2));
+    console.log(`[generate] icpScore=${icpScore} dmuScore=${dmuScore} mode=${mode}`);
+    console.log("=".repeat(60));
 
     // ── Generate reports ─────────────────────────────────────────────────────
     const now = new Date();

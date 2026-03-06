@@ -744,6 +744,18 @@ export async function generateReports(
 ) {
   const lang = ctx.language === "ar" ? "Arabic" : "English";
 
+  // Log key fields so server logs confirm what Claude will receive
+  console.log("[ai-engine] generateReports called. Key context values:");
+  console.log(`  companyName="${ctx.companyName}" productName="${ctx.productName}"`);
+  console.log(`  description="${ctx.description?.slice(0, 80)}"`);
+  console.log(`  countries="${ctx.countries}" industries="${ctx.industries}"`);
+  console.log(`  jobTitles="${ctx.jobTitles}" buyingTriggers="${ctx.buyingTriggers}"`);
+  console.log(`  topChallenges="${ctx.topChallenges}" biggestPain="${ctx.biggestPain?.slice(0, 80)}"`);
+  console.log(`  competitors="${ctx.competitors?.slice(0, 80)}" valueProposition="${ctx.valueProposition?.slice(0, 80)}"`);
+  console.log(`  outreachChannels="${ctx.outreachChannels}" outreachLang="${ctx.outreachLang}" tone="${ctx.tone}"`);
+  console.log(`  wantsColdCall=${ctx.wantsColdCall} wantsEmail=${ctx.wantsEmailSeq} wantsLinkedIn=${ctx.wantsLinkedinSeq} wantsWhatsApp=${ctx.wantsWhatsappSeq}`);
+  console.log(`  lang="${lang}" mode="${mode}"`);
+
   const [icp, dmu, abm, outreach, lookalike, successProbability] = await Promise.all([
     generateIcp(ctx, lang, mode, now),
     generateDmu(ctx, lang, mode, now),

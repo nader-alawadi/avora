@@ -378,19 +378,26 @@ export default function OnboardingWizard() {
 
   const saveStep = useCallback(async (stepNum: number, stepAnswers: StepAnswers) => {
     if (savingRef.current) return;
+    if (!Object.keys(stepAnswers).length) return; // nothing to save
     savingRef.current = true;
     const serialized: Record<string, string> = {};
     for (const [k, v] of Object.entries(stepAnswers)) {
-      serialized[k] = Array.isArray(v) ? JSON.stringify(v) : v;
+      serialized[k] = Array.isArray(v) ? JSON.stringify(v) : String(v);
     }
     try {
-      await fetch("/api/onboarding/answers", {
+      const res = await fetch("/api/onboarding/answers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ step: stepNum, answers: serialized }),
       });
-    } catch { /* silent */ }
-    savingRef.current = false;
+      if (!res.ok) {
+        console.error(`[saveStep] step ${stepNum} save failed:`, await res.text());
+      }
+    } catch (err) {
+      console.error(`[saveStep] step ${stepNum} network error:`, err);
+    } finally {
+      savingRef.current = false; // always release the lock
+    }
   }, []);
 
   // ── Navigation ───────────────────────────────────────────────────────────────
@@ -430,12 +437,32 @@ export default function OnboardingWizard() {
 
   const handleGenerate = async () => {
     setGenerating(true);
-    await saveStep(step, answers[step] ?? {});
+
+    // Save all unsaved steps before generating (flush every step in order)
+    for (let s = 0; s <= 10; s++) {
+      if (answers[s] && Object.keys(answers[s]).length) {
+        savingRef.current = false; // release lock between steps
+        await saveStep(s, answers[s]);
+      }
+    }
+
     setShowConfetti(true);
-    setTimeout(() => {
-      fetch("/api/reports/generate", { method: "POST" })
-        .then(() => { window.location.href = "/dashboard"; })
-        .catch(() => { window.location.href = "/dashboard"; });
+
+    setTimeout(async () => {
+      try {
+        const res = await fetch("/api/reports/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ language: lang }),
+        });
+        if (!res.ok) {
+          console.error("[handleGenerate] generate failed:", res.status, await res.text());
+        }
+      } catch (err) {
+        console.error("[handleGenerate] network error:", err);
+      } finally {
+        window.location.href = "/dashboard";
+      }
     }, 2000);
   };
 
