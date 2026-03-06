@@ -1,26 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import Anthropic from "@anthropic-ai/sdk";
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
-const AI_CONFIGURED =
-  ANTHROPIC_API_KEY.length > 0 &&
-  !ANTHROPIC_API_KEY.startsWith("your-") &&
-  !ANTHROPIC_API_KEY.startsWith("sk-ant-placeholder");
-
-const client = AI_CONFIGURED ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
+import { requireAnthropicClient } from "@/lib/anthropic-client";
 
 export async function POST(req: NextRequest) {
   try { await requireAuth(); } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!AI_CONFIGURED || !client) {
+  let client;
+  try {
+    client = requireAnthropicClient();
+  } catch {
     console.error("[ai-generate] ANTHROPIC_API_KEY is missing or is a placeholder");
-    return NextResponse.json(
-      { error: "AI_NOT_CONFIGURED" },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
   }
 
   const { field, context, lang } = await req.json();
@@ -67,14 +59,12 @@ export async function POST(req: NextRequest) {
   const promptFn = fieldPrompts[field];
   if (!promptFn) return NextResponse.json({ error: "Unknown field" }, { status: 400 });
 
-  const userPrompt = promptFn(context || {});
-
   try {
     const msg = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 300,
       system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: [{ role: "user", content: promptFn(context || {}) }],
     });
 
     const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";

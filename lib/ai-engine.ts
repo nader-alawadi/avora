@@ -1,8 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { requireAnthropicClient } from "@/lib/anthropic-client";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const anthropic = requireAnthropicClient();
 
 // ── Context interface ─────────────────────────────────────────────────────────
 // Maps all 12 wizard steps into a single flat context object.
