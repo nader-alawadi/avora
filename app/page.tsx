@@ -57,14 +57,19 @@ function Navbar() {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm"
+          ? "bg-white/95 backdrop-blur-xl border-b border-[#D5ECEC] shadow-sm"
           : "bg-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
         {/* Logo */}
         <Link href="/" aria-label="AVORA home">
-          <AvoraLogo size={34} showTagline textColor={scrolled ? undefined : "white"} taglineColor={scrolled ? undefined : "rgba(255,255,255,0.5)"} />
+          <AvoraLogo
+            size={34}
+            showTagline
+            textColor={scrolled ? undefined : "white"}
+            taglineColor={scrolled ? undefined : "rgba(255,255,255,0.5)"}
+          />
         </Link>
 
         {/* Desktop nav */}
@@ -79,11 +84,11 @@ function Navbar() {
               key={item.label}
               href={item.href}
               className={`text-sm font-medium transition-colors relative group ${
-                scrolled ? "text-gray-600 hover:text-[#2563EB]" : "text-white/80 hover:text-white"
+                scrolled ? "text-[#4A6B6B] hover:text-[#1A6B6B]" : "text-white/80 hover:text-white"
               }`}
             >
               {item.label}
-              <span className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-[#2563EB] group-hover:w-full transition-all duration-300 rounded-full" />
+              <span className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-[#FF5252] group-hover:w-full transition-all duration-300 rounded-full" />
             </a>
           ))}
         </div>
@@ -93,7 +98,7 @@ function Navbar() {
           <Link
             href="/login"
             className={`text-sm font-semibold transition-colors ${
-              scrolled ? "text-gray-700 hover:text-[#2563EB]" : "text-white/90 hover:text-white"
+              scrolled ? "text-[#4A6B6B] hover:text-[#1A6B6B]" : "text-white/90 hover:text-white"
             }`}
           >
             Sign In
@@ -101,7 +106,7 @@ function Navbar() {
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Link
               href="/register"
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors btn-glow-blue shadow-lg"
+              className="bg-[#FF5252] hover:bg-[#E04545] text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors btn-glow-coral shadow-lg"
             >
               Get Started Free
             </Link>
@@ -114,9 +119,9 @@ function Navbar() {
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
-          <div className={`w-5 h-0.5 mb-1 transition-all ${scrolled ? "bg-gray-800" : "bg-white"} ${mobileOpen ? "rotate-45 translate-y-1.5" : ""}`} />
-          <div className={`w-5 h-0.5 mb-1 transition-all ${scrolled ? "bg-gray-800" : "bg-white"} ${mobileOpen ? "opacity-0" : ""}`} />
-          <div className={`w-5 h-0.5 transition-all ${scrolled ? "bg-gray-800" : "bg-white"} ${mobileOpen ? "-rotate-45 -translate-y-1.5" : ""}`} />
+          <div className={`w-5 h-0.5 mb-1 transition-all ${scrolled ? "bg-[#1A2E2E]" : "bg-white"} ${mobileOpen ? "rotate-45 translate-y-1.5" : ""}`} />
+          <div className={`w-5 h-0.5 mb-1 transition-all ${scrolled ? "bg-[#1A2E2E]" : "bg-white"} ${mobileOpen ? "opacity-0" : ""}`} />
+          <div className={`w-5 h-0.5 transition-all ${scrolled ? "bg-[#1A2E2E]" : "bg-white"} ${mobileOpen ? "-rotate-45 -translate-y-1.5" : ""}`} />
         </button>
       </div>
 
@@ -127,21 +132,21 @@ function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white border-t border-gray-100 px-4 py-6 space-y-4"
+            className="md:hidden bg-white border-t border-[#D5ECEC] px-4 py-6 space-y-4"
           >
             {["Features", "How It Works", "Pricing", "Contact"].map((item) => (
               <a
                 key={item}
                 href={`#${item.toLowerCase().replace(/\s+/g, "-")}`}
-                className="block text-gray-700 font-medium hover:text-[#2563EB] transition-colors"
+                className="block text-[#4A6B6B] font-medium hover:text-[#1A6B6B] transition-colors"
                 onClick={() => setMobileOpen(false)}
               >
                 {item}
               </a>
             ))}
             <div className="pt-4 flex flex-col gap-3">
-              <Link href="/login" className="text-center py-2.5 text-gray-700 font-semibold border border-gray-200 rounded-xl">Sign In</Link>
-              <Link href="/register" className="text-center py-2.5 bg-[#2563EB] text-white font-semibold rounded-xl">Get Started Free</Link>
+              <Link href="/login" className="text-center py-2.5 text-[#4A6B6B] font-semibold border border-[#9BCECE] rounded-xl">Sign In</Link>
+              <Link href="/register" className="text-center py-2.5 bg-[#FF5252] text-white font-semibold rounded-xl">Get Started Free</Link>
             </div>
           </motion.div>
         )}
@@ -162,9 +167,9 @@ export default function LandingPage() {
       ),
       title: "Ideal Customer Profile (ICP)",
       desc: "AI-generated ICP with firmographics, psychographics, buying triggers, and disqualifiers based on your real customer evidence.",
-      gradient: "from-blue-500 to-blue-600",
-      bg: "bg-blue-50",
-      border: "border-blue-100",
+      iconBg: "bg-[#1A6B6B]",
+      cardBg: "bg-[#EFF6F6]",
+      border: "border-[#D5ECEC]",
     },
     {
       icon: (
@@ -174,9 +179,9 @@ export default function LandingPage() {
       ),
       title: "Decision Making Unit (DMU) Map",
       desc: "Map every stakeholder in the buying process — economic buyer, champion, technical buyer — with engagement strategies.",
-      gradient: "from-purple-500 to-purple-600",
-      bg: "bg-purple-50",
-      border: "border-purple-100",
+      iconBg: "bg-[#2D8080]",
+      cardBg: "bg-[#EFF6F6]",
+      border: "border-[#D5ECEC]",
     },
     {
       icon: (
@@ -186,9 +191,9 @@ export default function LandingPage() {
       ),
       title: "ABM Targeting Strategy",
       desc: "Account-based marketing with Tier 1, 2, and 3 segmentation and prioritization frameworks for maximum ROI.",
-      gradient: "from-amber-500 to-orange-500",
-      bg: "bg-amber-50",
-      border: "border-amber-100",
+      iconBg: "bg-[#FF5252]",
+      cardBg: "bg-[#FFF5F5]",
+      border: "border-[#FFD5D5]",
     },
     {
       icon: (
@@ -198,9 +203,9 @@ export default function LandingPage() {
       ),
       title: "Outreach Playbook",
       desc: "LinkedIn, Email, and WhatsApp outreach sequences with messaging frameworks tailored precisely to your ICP.",
-      gradient: "from-green-500 to-emerald-500",
-      bg: "bg-green-50",
-      border: "border-green-100",
+      iconBg: "bg-[#1A6B6B]",
+      cardBg: "bg-[#EFF6F6]",
+      border: "border-[#D5ECEC]",
     },
     {
       icon: (
@@ -210,9 +215,9 @@ export default function LandingPage() {
       ),
       title: "Lookalike Search Criteria",
       desc: "Boolean search strings and criteria to find accounts that match your best customers — no personal data exposed.",
-      gradient: "from-cyan-500 to-blue-500",
-      bg: "bg-cyan-50",
-      border: "border-cyan-100",
+      iconBg: "bg-[#2D8080]",
+      cardBg: "bg-[#EFF6F6]",
+      border: "border-[#D5ECEC]",
     },
     {
       icon: (
@@ -222,9 +227,9 @@ export default function LandingPage() {
       ),
       title: "Leads Dashboard",
       desc: "Order targeted leads delivered by the Enigma Sales team with full CRM data and personality analysis links.",
-      gradient: "from-rose-500 to-pink-500",
-      bg: "bg-rose-50",
-      border: "border-rose-100",
+      iconBg: "bg-[#1A6B6B]",
+      cardBg: "bg-[#EFF6F6]",
+      border: "border-[#D5ECEC]",
     },
   ];
 
@@ -285,7 +290,7 @@ export default function LandingPage() {
       role: "VP of Sales",
       company: "TechCorp MENA",
       initials: "SK",
-      color: "bg-blue-500",
+      color: "bg-[#1A6B6B]",
     },
     {
       quote: "The AI-generated outreach sequences are incredibly precise. We closed 3 enterprise deals in the first month after implementing AVORA's strategy.",
@@ -293,7 +298,7 @@ export default function LandingPage() {
       role: "Founder & CEO",
       company: "GrowthLab",
       initials: "AM",
-      color: "bg-purple-500",
+      color: "bg-[#2D8080]",
     },
     {
       quote: "Best investment for our GTM team. The Arabic support made it accessible to our entire team and the lead quality is exceptional.",
@@ -301,7 +306,7 @@ export default function LandingPage() {
       role: "Marketing Director",
       company: "Apex Solutions",
       initials: "LR",
-      color: "bg-green-500",
+      color: "bg-[#FF5252]",
     },
   ];
 
@@ -312,9 +317,9 @@ export default function LandingPage() {
       {/* ── Hero ────────────────────────────────────────────── */}
       <section className="relative min-h-screen flex items-center overflow-hidden gradient-hero">
         {/* Gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl float-orb pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl float-orb-delayed pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#2D8080]/20 rounded-full blur-3xl float-orb pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#FF5252]/10 rounded-full blur-3xl float-orb-delayed pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#2D8080]/05 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
           <motion.div
@@ -326,7 +331,7 @@ export default function LandingPage() {
             {/* Badge */}
             <motion.div variants={fadeUp} custom={0} className="mb-8">
               <span className="inline-flex items-center gap-2 glass-navy text-white/90 text-xs font-semibold px-4 py-2 rounded-full border border-white/10">
-                <span className="w-1.5 h-1.5 bg-[#10B981] rounded-full animate-pulse" />
+                <span className="w-1.5 h-1.5 bg-[#FF5252] rounded-full animate-pulse" />
                 AI-Powered GTM Strategy Platform
               </span>
             </motion.div>
@@ -336,7 +341,7 @@ export default function LandingPage() {
               variants={fadeUp}
               custom={1}
               className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-white leading-[1.05] tracking-tight mb-6"
-              style={{ letterSpacing: "-0.02em" }}
+              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
             >
               Your GTM Strategy,{" "}
               <br className="hidden md:block" />
@@ -362,7 +367,7 @@ export default function LandingPage() {
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Link
                   href="/register"
-                  className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold px-8 py-4 rounded-2xl text-lg transition-colors btn-glow-blue shadow-xl"
+                  className="inline-flex items-center gap-2 bg-[#FF5252] hover:bg-[#E04545] text-white font-bold px-8 py-4 rounded-2xl text-lg transition-colors btn-glow-coral shadow-xl"
                 >
                   Get Your Strategy Free
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -413,15 +418,15 @@ export default function LandingPage() {
       </section>
 
       {/* ── Social proof marquee ─────────────────────────────── */}
-      <section className="py-12 bg-white overflow-hidden border-b border-gray-100">
+      <section className="py-12 bg-white overflow-hidden border-b border-[#D5ECEC]">
         <div className="max-w-7xl mx-auto px-4 mb-6 text-center">
-          <p className="text-sm text-gray-400 font-medium uppercase tracking-widest">Trusted by growth teams across industries</p>
+          <p className="text-sm text-[#8AACAC] font-medium uppercase tracking-widest">Trusted by growth teams across industries</p>
         </div>
         <div className="relative overflow-hidden">
           <div className="marquee-track flex items-center gap-16">
             {[...Array(2)].map((_, pass) =>
               ["B2B SaaS", "FinTech", "EdTech", "HealthTech", "E-Commerce", "PropTech", "MarTech", "HR Tech", "LegalTech", "InsurTech"].map((name, i) => (
-                <span key={`${pass}-${i}`} className="text-gray-300 font-semibold text-sm whitespace-nowrap px-4">
+                <span key={`${pass}-${i}`} className="text-[#9BCECE] font-semibold text-sm whitespace-nowrap px-4">
                   {name}
                 </span>
               ))
@@ -440,19 +445,19 @@ export default function LandingPage() {
             variants={stagger}
             className="text-center mb-16"
           >
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#2563EB] uppercase tracking-widest mb-4">
+            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#FF5252] uppercase tracking-widest mb-4">
               What You Get
             </motion.span>
             <motion.h2
               variants={fadeUp}
               custom={1}
-              className="text-4xl md:text-5xl font-bold text-[#1E293B] leading-tight mb-4"
-              style={{ letterSpacing: "-0.02em" }}
+              className="text-4xl md:text-5xl font-bold text-[#1A2E2E] leading-tight mb-4"
+              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
             >
               Everything You Need to{" "}
-              <span className="text-gradient">Win B2B Sales</span>
+              <span className="text-gradient-teal">Win B2B Sales</span>
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-gray-500 max-w-xl mx-auto text-lg">
+            <motion.p variants={fadeUp} custom={2} className="text-[#4A6B6B] max-w-xl mx-auto text-lg">
               Based on your real business data — not templates, not guesses.
             </motion.p>
           </motion.div>
@@ -469,14 +474,14 @@ export default function LandingPage() {
                 key={i}
                 variants={fadeUp}
                 custom={i}
-                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(0,0,0,0.10)" }}
-                className={`group rounded-2xl p-7 border ${f.border} ${f.bg} cursor-default transition-shadow duration-300`}
+                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.12)" }}
+                className={`group rounded-2xl p-7 border ${f.border} ${f.cardBg} cursor-default transition-shadow duration-300`}
               >
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.gradient} flex items-center justify-center text-white mb-5 group-hover:scale-110 transition-transform duration-300`}>
+                <div className={`w-12 h-12 rounded-xl ${f.iconBg} flex items-center justify-center text-white mb-5 group-hover:scale-110 transition-transform duration-300`}>
                   {f.icon}
                 </div>
-                <h3 className="font-bold text-[#1E293B] mb-3 text-lg">{f.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+                <h3 className="font-bold text-[#1A2E2E] mb-3 text-lg">{f.title}</h3>
+                <p className="text-[#4A6B6B] text-sm leading-relaxed">{f.desc}</p>
               </motion.div>
             ))}
           </motion.div>
@@ -485,8 +490,8 @@ export default function LandingPage() {
 
       {/* ── Stats dark section ───────────────────────────────── */}
       <section className="py-24 gradient-dark-section relative overflow-hidden">
-        <div className="absolute top-0 left-1/4 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/4 w-64 h-64 bg-[#2D8080]/15 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-[#FF5252]/08 rounded-full blur-3xl" />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial="hidden"
@@ -498,7 +503,7 @@ export default function LandingPage() {
             <motion.h2
               variants={fadeUp}
               className="text-4xl md:text-5xl font-bold text-white mb-4"
-              style={{ letterSpacing: "-0.02em" }}
+              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
             >
               Results That Speak for Themselves
             </motion.h2>
@@ -514,13 +519,13 @@ export default function LandingPage() {
             className="grid grid-cols-2 md:grid-cols-4 gap-8"
           >
             {[
-              { value: 500, suffix: "+", label: "Companies Onboarded", color: "text-[#60A5FA]" },
-              { value: 95, suffix: "%", label: "Strategy Accuracy", color: "text-[#A78BFA]" },
-              { value: 3, suffix: "x", label: "Avg Outreach Response Rate", color: "text-[#34D399]" },
-              { value: 7, suffix: " days", label: "Lead Delivery SLA", color: "text-[#FBBF24]" },
+              { value: 500, suffix: "+", label: "Companies Onboarded", color: "text-[#4DB8B8]" },
+              { value: 95, suffix: "%", label: "Strategy Accuracy", color: "text-[#FF8080]" },
+              { value: 3, suffix: "x", label: "Avg Outreach Response Rate", color: "text-[#80D4D4]" },
+              { value: 7, suffix: " days", label: "Lead Delivery SLA", color: "text-white/90" },
             ].map((stat, i) => (
               <motion.div key={i} variants={fadeUp} custom={i} className="text-center">
-                <div className={`text-5xl font-extrabold mb-2 ${stat.color}`}>
+                <div className={`text-5xl font-extrabold mb-2 ${stat.color}`} style={{ fontFamily: "'Nunito', sans-serif" }}>
                   <AnimatedNumber target={stat.value} suffix={stat.suffix} />
                 </div>
                 <div className="text-white/50 text-sm font-medium">{stat.label}</div>
@@ -540,18 +545,18 @@ export default function LandingPage() {
             variants={stagger}
             className="text-center mb-16"
           >
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#2563EB] uppercase tracking-widest mb-4">
+            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#FF5252] uppercase tracking-widest mb-4">
               How It Works
             </motion.span>
             <motion.h2
               variants={fadeUp}
               custom={1}
-              className="text-4xl md:text-5xl font-bold text-[#1E293B] mb-4"
-              style={{ letterSpacing: "-0.02em" }}
+              className="text-4xl md:text-5xl font-bold text-[#1A2E2E] mb-4"
+              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
             >
               From Zero to Full GTM Strategy
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-gray-500 max-w-xl mx-auto text-lg">
+            <motion.p variants={fadeUp} custom={2} className="text-[#4A6B6B] max-w-xl mx-auto text-lg">
               A structured, AI-guided onboarding that turns your business knowledge into strategy.
             </motion.p>
           </motion.div>
@@ -568,18 +573,18 @@ export default function LandingPage() {
                 key={i}
                 variants={fadeUp}
                 custom={i}
-                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(37,99,235,0.08)" }}
-                className="relative bg-white rounded-2xl p-7 border border-blue-50 shadow-sm transition-all duration-300"
+                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.10)" }}
+                className="relative bg-white rounded-2xl p-7 border border-[#D5ECEC] shadow-sm transition-all duration-300"
               >
                 {i < steps.length - 1 && (
-                  <div className="hidden lg:block absolute top-10 -right-3 w-6 h-0.5 bg-gradient-to-r from-blue-200 to-transparent z-10" />
+                  <div className="hidden lg:block absolute top-10 -right-3 w-6 h-0.5 bg-gradient-to-r from-[#9BCECE] to-transparent z-10" />
                 )}
-                <div className="w-10 h-10 bg-[#2563EB] text-white rounded-xl flex items-center justify-center mb-5">
+                <div className="w-10 h-10 bg-[#1A6B6B] text-white rounded-xl flex items-center justify-center mb-5">
                   {s.icon}
                 </div>
-                <div className="text-xs font-bold text-[#2563EB] mb-2">{s.n}</div>
-                <h3 className="font-bold text-[#1E293B] mb-2 text-lg">{s.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{s.desc}</p>
+                <div className="text-xs font-bold text-[#FF5252] mb-2">{s.n}</div>
+                <h3 className="font-bold text-[#1A2E2E] mb-2 text-lg">{s.title}</h3>
+                <p className="text-[#4A6B6B] text-sm leading-relaxed">{s.desc}</p>
               </motion.div>
             ))}
           </motion.div>
@@ -596,14 +601,14 @@ export default function LandingPage() {
             variants={stagger}
             className="text-center mb-16"
           >
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#2563EB] uppercase tracking-widest mb-4">
+            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#FF5252] uppercase tracking-widest mb-4">
               Testimonials
             </motion.span>
             <motion.h2
               variants={fadeUp}
               custom={1}
-              className="text-4xl md:text-5xl font-bold text-[#1E293B] mb-4"
-              style={{ letterSpacing: "-0.02em" }}
+              className="text-4xl md:text-5xl font-bold text-[#1A2E2E] mb-4"
+              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
             >
               Loved by B2B Teams
             </motion.h2>
@@ -620,8 +625,8 @@ export default function LandingPage() {
                 key={i}
                 variants={fadeUp}
                 custom={i}
-                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(0,0,0,0.08)" }}
-                className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm transition-all duration-300"
+                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.10)" }}
+                className="bg-white rounded-2xl p-7 border border-[#D5ECEC] shadow-sm transition-all duration-300"
               >
                 <div className="flex mb-4">
                   {Array.from({ length: 5 }).map((_, s) => (
@@ -630,14 +635,14 @@ export default function LandingPage() {
                     </svg>
                   ))}
                 </div>
-                <p className="text-gray-600 text-sm leading-relaxed mb-6 italic">&ldquo;{t.quote}&rdquo;</p>
+                <p className="text-[#4A6B6B] text-sm leading-relaxed mb-6 italic">&ldquo;{t.quote}&rdquo;</p>
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
                     {t.initials}
                   </div>
                   <div>
-                    <div className="font-semibold text-[#1E293B] text-sm">{t.name}</div>
-                    <div className="text-gray-400 text-xs">{t.role} · {t.company}</div>
+                    <div className="font-semibold text-[#1A2E2E] text-sm">{t.name}</div>
+                    <div className="text-[#8AACAC] text-xs">{t.role} · {t.company}</div>
                   </div>
                 </div>
               </motion.div>
@@ -656,18 +661,18 @@ export default function LandingPage() {
             variants={stagger}
             className="text-center mb-16"
           >
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#2563EB] uppercase tracking-widest mb-4">
+            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#FF5252] uppercase tracking-widest mb-4">
               Pricing
             </motion.span>
             <motion.h2
               variants={fadeUp}
               custom={1}
-              className="text-4xl md:text-5xl font-bold text-[#1E293B] mb-4"
-              style={{ letterSpacing: "-0.02em" }}
+              className="text-4xl md:text-5xl font-bold text-[#1A2E2E] mb-4"
+              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
             >
               Simple, Transparent Pricing
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-gray-500 text-lg">
+            <motion.p variants={fadeUp} custom={2} className="text-[#4A6B6B] text-lg">
               Start free. Upgrade when you need leads.
             </motion.p>
           </motion.div>
@@ -683,21 +688,21 @@ export default function LandingPage() {
             <motion.div
               variants={fadeUp}
               custom={0}
-              whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(0,0,0,0.08)" }}
-              className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm transition-all duration-300"
+              whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.10)" }}
+              className="bg-white rounded-2xl p-8 border border-[#D5ECEC] shadow-sm transition-all duration-300"
             >
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">LITE</div>
-              <div className="text-5xl font-extrabold text-[#1E293B] mb-1">Free</div>
-              <p className="text-gray-400 text-sm mb-8">Forever</p>
+              <div className="text-xs font-bold text-[#8AACAC] uppercase tracking-widest mb-3">LITE</div>
+              <div className="text-5xl font-extrabold text-[#1A2E2E] mb-1" style={{ fontFamily: "'Nunito', sans-serif" }}>Free</div>
+              <p className="text-[#8AACAC] text-sm mb-8">Forever</p>
               <ul className="space-y-3 mb-8">
                 {["Full GTM strategy generation", "ICP, DMU, ABM, Outreach", "Up to 3 PDF exports", "Lead requests at $15/lead"].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-gray-600">
-                    <span className="w-5 h-5 rounded-full bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✓</span>
+                  <li key={item} className="flex items-start gap-3 text-sm text-[#4A6B6B]">
+                    <span className="w-5 h-5 rounded-full bg-[#EFF6F6] text-[#1A6B6B] flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✓</span>
                     {item}
                   </li>
                 ))}
                 {["Leads Dashboard", "XLSX export"].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-gray-300">
+                  <li key={item} className="flex items-start gap-3 text-sm text-[#8AACAC]">
                     <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">✗</span>
                     {item}
                   </li>
@@ -706,7 +711,7 @@ export default function LandingPage() {
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Link
                   href="/register"
-                  className="block text-center border-2 border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB] hover:text-white font-bold px-6 py-3 rounded-xl transition-all duration-200"
+                  className="block text-center border-2 border-[#1A6B6B] text-[#1A6B6B] hover:bg-[#1A6B6B] hover:text-white font-bold px-6 py-3 rounded-xl transition-all duration-200"
                 >
                   Start Free
                 </Link>
@@ -718,14 +723,14 @@ export default function LandingPage() {
               variants={fadeUp}
               custom={1}
               whileHover={{ y: -4 }}
-              className="relative gradient-hero rounded-2xl p-8 text-white shadow-2xl shadow-blue-900/30 md:-mt-4 md:mb-4 transition-all duration-300"
+              className="relative gradient-hero rounded-2xl p-8 text-white shadow-2xl shadow-[#1A5C5C]/30 md:-mt-4 md:mb-4 transition-all duration-300"
             >
-              <div className="absolute top-5 right-5 bg-[#7C3AED] text-white text-xs font-bold px-3 py-1 rounded-full">
+              <div className="absolute top-5 right-5 bg-[#FF5252] text-white text-xs font-bold px-3 py-1 rounded-full">
                 MOST POPULAR
               </div>
               <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-x-10 -translate-y-10 blur-2xl" />
               <div className="text-xs font-bold text-white/50 uppercase tracking-widest mb-3">PLUS</div>
-              <div className="text-5xl font-extrabold mb-1">$5<span className="text-2xl font-normal text-white/50">/lead</span></div>
+              <div className="text-5xl font-extrabold mb-1" style={{ fontFamily: "'Nunito', sans-serif" }}>$5<span className="text-2xl font-normal text-white/50">/lead</span></div>
               <p className="text-white/40 text-sm mb-8">After confirmed payment</p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -745,7 +750,7 @@ export default function LandingPage() {
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Link
                   href="/register"
-                  className="block text-center bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold px-6 py-3 rounded-xl transition-colors btn-glow-blue shadow-lg"
+                  className="block text-center bg-[#FF5252] hover:bg-[#E04545] text-white font-bold px-6 py-3 rounded-xl transition-colors btn-glow-coral shadow-lg"
                 >
                   Get Started
                 </Link>
@@ -756,16 +761,16 @@ export default function LandingPage() {
             <motion.div
               variants={fadeUp}
               custom={2}
-              whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(0,0,0,0.08)" }}
-              className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm transition-all duration-300"
+              whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.10)" }}
+              className="bg-white rounded-2xl p-8 border border-[#D5ECEC] shadow-sm transition-all duration-300"
             >
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">ENTERPRISE</div>
-              <div className="text-5xl font-extrabold text-[#1E293B] mb-1">Custom</div>
-              <p className="text-gray-400 text-sm mb-8">Contact us for pricing</p>
+              <div className="text-xs font-bold text-[#8AACAC] uppercase tracking-widest mb-3">ENTERPRISE</div>
+              <div className="text-5xl font-extrabold text-[#1A2E2E] mb-1" style={{ fontFamily: "'Nunito', sans-serif" }}>Custom</div>
+              <p className="text-[#8AACAC] text-sm mb-8">Contact us for pricing</p>
               <ul className="space-y-3 mb-8">
                 {["Everything in PLUS", "Dedicated account manager", "Custom lead volumes", "White-label reports", "Team collaboration", "API access"].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-gray-600">
-                    <span className="w-5 h-5 rounded-full bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✓</span>
+                  <li key={item} className="flex items-start gap-3 text-sm text-[#4A6B6B]">
+                    <span className="w-5 h-5 rounded-full bg-[#FFF0F0] text-[#FF5252] flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✓</span>
                     {item}
                   </li>
                 ))}
@@ -773,7 +778,7 @@ export default function LandingPage() {
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Link
                   href="/contact"
-                  className="block text-center border-2 border-[#7C3AED] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white font-bold px-6 py-3 rounded-xl transition-all duration-200"
+                  className="block text-center border-2 border-[#1A6B6B] text-[#1A6B6B] hover:bg-[#1A6B6B] hover:text-white font-bold px-6 py-3 rounded-xl transition-all duration-200"
                 >
                   Contact Sales
                 </Link>
@@ -785,7 +790,7 @@ export default function LandingPage() {
 
       {/* ── Final CTA ─────────────────────────────────────────── */}
       <section className="py-28 gradient-hero relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-3xl float-orb" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#2D8080]/15 rounded-full blur-3xl float-orb" />
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -796,7 +801,7 @@ export default function LandingPage() {
           <motion.h2
             variants={fadeUp}
             className="text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight"
-            style={{ letterSpacing: "-0.02em" }}
+            style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
           >
             Ready to Build Your{" "}
             <span className="hero-gradient-text">GTM Strategy?</span>
@@ -808,7 +813,7 @@ export default function LandingPage() {
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Link
                 href="/register"
-                className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold px-10 py-4 rounded-2xl text-lg transition-colors btn-glow-blue shadow-xl"
+                className="inline-flex items-center gap-2 bg-[#FF5252] hover:bg-[#E04545] text-white font-bold px-10 py-4 rounded-2xl text-lg transition-colors btn-glow-coral shadow-xl"
               >
                 Start Building for Free
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -829,12 +834,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ────────────────────────────────────────────── */}
-      <footer className="bg-[#0A1628] pt-16 pb-10">
+      <footer className="bg-[#1A5C5C] pt-16 pb-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
             {/* Brand */}
             <div className="md:col-span-1">
-              <AvoraLogo size={32} showTagline textColor="white" taglineColor="rgba(255,255,255,0.35)" />
+              <AvoraLogo size={32} showTagline variant="light" taglineColor="rgba(255,255,255,0.35)" />
               <p className="mt-4 text-sm text-white/35 leading-relaxed">
                 AI-powered GTM strategy platform for B2B sales teams.
               </p>
@@ -862,6 +867,11 @@ export default function LandingPage() {
           </div>
           <div className="border-t border-white/8 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-white/25">© 2025 AVORA by Enigma Sales. All rights reserved.</p>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF5252] opacity-60" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF5252] opacity-30" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF5252] opacity-15" />
+            </div>
             <p className="text-xs text-white/20">English & Arabic · AI-Powered GTM Platform</p>
           </div>
         </div>

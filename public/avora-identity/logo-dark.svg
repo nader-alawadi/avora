@@ -1,0 +1,39 @@
+<svg viewBox="0 0 148 48" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AVORA">
+  <title>AVORA</title>
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@800&amp;display=swap');
+    </style>
+  </defs>
+  <!--
+    AVORA Wordmark — Dark variant
+    Teal text (#1A6B6B) + coral dot — for use on white / light backgrounds.
+
+    Rules:
+    · Never add a drop shadow to this logo
+    · Never stretch or distort the letterforms
+    · Minimum clear space = height of the letter "a" on all sides
+    · Do not alter the coral dot color (#FF5252)
+  -->
+
+  <!-- Wordmark: "avora" in Nunito ExtraBold -->
+  <text
+    x="2"
+    y="42"
+    font-family="'Nunito', 'Poppins', sans-serif"
+    font-weight="800"
+    font-size="44"
+    fill="#1A6B6B"
+  >avora</text>
+
+  <!--
+    Coral dot inside the "o" counter.
+    Nunito ExtraBold at 44px approximate metrics:
+      a ≈ 25px  → ends at x ≈ 27
+      v ≈ 27px  → ends at x ≈ 54
+      o ≈ 29px  → center_x ≈ 54 + 14.5 + 2 = 70.5
+    x-height ≈ 30px → center_y = 42 − 15 = 27
+    Inner counter radius ≈ 8px → safe dot radius = 6
+  -->
+  <circle cx="70" cy="27" r="6" fill="#FF5252"/>
+</svg>

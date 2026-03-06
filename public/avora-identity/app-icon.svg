@@ -1,0 +1,51 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AVORA app icon">
+  <title>AVORA App Icon</title>
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@800&amp;display=swap');
+    </style>
+  </defs>
+  <!--
+    AVORA App Icon
+    ─────────────
+    · Square canvas: 200 × 200
+    · Rounded corners: rx=44 (22% of 200 — matches Apple icon radius convention)
+    · Background: dark teal #1A5C5C
+    · Letter "a": mint teal #4DB8B8, Nunito ExtraBold, centered
+    · Coral dot: #FF5252, centered inside the "a" bowl counter
+
+    Do NOT use this icon on a transparent background for nav/header use —
+    use logo-dark.svg or logo-light.svg instead.
+  -->
+
+  <!-- Background -->
+  <rect width="200" height="200" rx="44" fill="#1A5C5C"/>
+
+  <!-- Subtle inner highlight at top -->
+  <rect width="200" height="110" rx="44" fill="white" fill-opacity="0.04"/>
+
+  <!--
+    Letter "a" — mint teal, Nunito ExtraBold 130px
+    text-anchor=middle centers horizontally at x=100
+    Baseline y=162 leaves ~38px bottom margin
+    Top of x-height: 162 − (0.68 × 130) ≈ 73px
+  -->
+  <text
+    x="100"
+    y="162"
+    text-anchor="middle"
+    font-family="'Nunito', 'Poppins', sans-serif"
+    font-weight="800"
+    font-size="130"
+    fill="#4DB8B8"
+  >a</text>
+
+  <!--
+    Coral dot inside the "a" bowl counter.
+    For Nunito ExtraBold at 130px, the double-story "a" bowl:
+      · Bowl is the lower circular counter of the letterform
+      · Approximate bowl center: cx=100, cy=138
+      · Inner counter radius ≈ 20px → safe dot radius = 14
+  -->
+  <circle cx="100" cy="138" r="14" fill="#FF5252"/>
+</svg>

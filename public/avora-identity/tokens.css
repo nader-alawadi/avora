@@ -1,0 +1,114 @@
+/**
+ * AVORA Design Tokens
+ * ───────────────────
+ * Source of truth for all brand colors, spacing, typography, and shape.
+ * Import this file before any other stylesheet.
+ *
+ * Usage:
+ *   @import './tokens.css';
+ *   .my-el { color: var(--avora-teal-dark); }
+ */
+
+:root {
+  /* ── Color Palette ─────────────────────────────────────── */
+
+  /* Primary Teal */
+  --avora-teal-dark:    #1A6B6B;   /* Brand primary — teal text, teal icons     */
+  --avora-teal-medium:  #2D8080;   /* Secondary teal — hover states, accents    */
+  --avora-teal-bg:      #1A5C5C;   /* Dark teal — nav, hero, footer backgrounds */
+  --avora-teal-deeper:  #0F3D3D;   /* Deepest teal — dark section depth         */
+  --avora-teal-mint:    #4DB8B8;   /* Mint — light teal for dark bg text/icons  */
+
+  /* Accent Coral */
+  --avora-coral:        #FF5252;   /* HERO ACCENT — CTAs, logo dot, badges      */
+  --avora-coral-dark:   #E04545;   /* Coral hover / pressed state               */
+  --avora-coral-light:  #FF8080;   /* Light coral — gradient endpoint, subtitles*/
+
+  /* Neutrals */
+  --avora-white:        #FFFFFF;
+  --avora-surface:      #F8F8F6;   /* Off-white page background                 */
+  --avora-surface-teal: #EFF6F6;   /* Light teal surface — card backgrounds     */
+
+  /* Text */
+  --avora-text-primary:   #1A2E2E; /* Near-black with teal warmth               */
+  --avora-text-secondary: #4A6B6B; /* Muted teal — body copy, captions          */
+  --avora-text-light:     #8AACAC; /* Placeholder, disabled text                */
+  --avora-text-on-dark:   #FFFFFF;
+  --avora-text-on-dark-muted: rgba(255, 255, 255, 0.55);
+
+  /* ── Border ────────────────────────────────────────────── */
+  --avora-border:        rgba(26, 107, 107, 0.10);
+  --avora-border-strong: rgba(26, 107, 107, 0.20);
+  --avora-border-teal:   #9BCECE;
+
+  /* ── Shadow ────────────────────────────────────────────── */
+  --avora-shadow-sm:    0 1px 3px rgba(26,107,107,0.06), 0 1px 2px rgba(26,107,107,0.04);
+  --avora-shadow-md:    0 4px 24px rgba(26,107,107,0.10);
+  --avora-shadow-lg:    0 16px 48px rgba(26,107,107,0.14);
+  --avora-shadow-xl:    0 24px 64px rgba(26,107,107,0.18);
+  --avora-shadow-teal:  0 8px 32px rgba(26,107,107,0.28);
+  --avora-shadow-coral: 0 8px 32px rgba(255,82,82,0.28);
+
+  /* ── Typography ────────────────────────────────────────── */
+  --avora-font-family:         'Nunito', 'Poppins', sans-serif;
+  --avora-font-family-body:    'Inter', 'Nunito', system-ui, sans-serif;
+  --avora-font-weight-regular: 400;
+  --avora-font-weight-medium:  500;
+  --avora-font-weight-semibold:600;
+  --avora-font-weight-bold:    700;
+  --avora-font-weight-extrabold:800;
+
+  --avora-text-xs:   0.75rem;   /* 12px */
+  --avora-text-sm:   0.875rem;  /* 14px */
+  --avora-text-base: 1rem;      /* 16px */
+  --avora-text-lg:   1.125rem;  /* 18px */
+  --avora-text-xl:   1.25rem;   /* 20px */
+  --avora-text-2xl:  1.5rem;    /* 24px */
+  --avora-text-3xl:  1.875rem;  /* 30px */
+  --avora-text-4xl:  2.25rem;   /* 36px */
+  --avora-text-5xl:  3rem;      /* 48px */
+  --avora-text-6xl:  3.75rem;   /* 60px */
+
+  --avora-leading-tight:  1.15;
+  --avora-leading-snug:   1.35;
+  --avora-leading-normal: 1.6;
+
+  /* ── Spacing ───────────────────────────────────────────── */
+  --avora-space-1:  4px;
+  --avora-space-2:  8px;
+  --avora-space-3:  12px;
+  --avora-space-4:  16px;
+  --avora-space-5:  20px;
+  --avora-space-6:  24px;
+  --avora-space-8:  32px;
+  --avora-space-10: 40px;
+  --avora-space-12: 48px;
+  --avora-space-16: 64px;
+  --avora-space-20: 80px;
+  --avora-space-24: 96px;
+
+  /* ── Border Radius ─────────────────────────────────────── */
+  --avora-radius-xs:   4px;
+  --avora-radius-sm:   8px;
+  --avora-radius-md:   12px;
+  --avora-radius-lg:   16px;
+  --avora-radius-xl:   24px;
+  --avora-radius-2xl:  32px;
+  --avora-radius-full: 9999px;  /* Always pill-shaped buttons */
+
+  /* App icon corner radius (22% of icon size) */
+  --avora-icon-radius-ratio: 0.22;
+
+  /* ── Transition ────────────────────────────────────────── */
+  --avora-transition-fast:   150ms cubic-bezier(0.22, 1, 0.36, 1);
+  --avora-transition-normal: 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  --avora-transition-slow:   400ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Z-index ───────────────────────────────────────────── */
+  --avora-z-base:    0;
+  --avora-z-raised:  10;
+  --avora-z-overlay: 100;
+  --avora-z-modal:   200;
+  --avora-z-nav:     300;
+  --avora-z-toast:   400;
+}

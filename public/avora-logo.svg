@@ -1,19 +1,31 @@
 <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#154f4c"/>
-      <stop offset="100%" stop-color="#1E6663"/>
-    </linearGradient>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@800&amp;display=swap');
+    </style>
   </defs>
-  <!-- Background -->
-  <rect width="200" height="200" rx="44" fill="url(#bg)"/>
-  <!-- Subtle top highlight -->
-  <rect width="200" height="100" rx="44" fill="white" fill-opacity="0.06"/>
-  <!-- A — left stroke -->
-  <path d="M100 28 L34 168" stroke="white" stroke-width="20" stroke-linecap="round" fill="none"/>
-  <!-- A — right stroke -->
-  <path d="M100 28 L166 168" stroke="white" stroke-width="20" stroke-linecap="round" fill="none"/>
-  <!-- Sparkline crossbar (data chart) -->
-  <path d="M60 122 Q72 104 85 116 Q98 96 115 110 Q130 90 148 104"
-    stroke="white" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Background with rounded corners (22%) -->
+  <rect width="200" height="200" rx="44" fill="#1A5C5C"/>
+  <!-- Subtle inner highlight -->
+  <rect width="200" height="110" rx="44" fill="white" fill-opacity="0.05"/>
+  <!--
+    Letter "a" in mint teal, centered.
+    Nunito ExtraBold 130px, text-anchor=middle, baseline y=162
+    x-height ≈ 88px  →  top of letter ≈ y=74
+  -->
+  <text
+    x="100"
+    y="162"
+    text-anchor="middle"
+    font-family="'Nunito', 'Poppins', sans-serif"
+    font-weight="800"
+    font-size="130"
+    fill="#4DB8B8"
+  >a</text>
+  <!--
+    Coral dot centered in the bowl of the "a".
+    For Nunito ExtraBold at 130px, the double-story "a" bowl center is
+    approximately at (100, 138) with inner radius ≈ 14px.
+  -->
+  <circle cx="100" cy="138" r="14" fill="#FF5252"/>
 </svg>
