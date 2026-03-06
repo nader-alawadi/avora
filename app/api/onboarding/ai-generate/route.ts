@@ -55,13 +55,19 @@ export async function POST(req: NextRequest) {
 
   const userPrompt = promptFn(context || {});
 
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 300,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
+  try {
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
 
-  const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
-  return NextResponse.json({ text });
+    const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
+    console.log(`[ai-generate] field=${field} text_len=${text.length}`);
+    return NextResponse.json({ text });
+  } catch (err) {
+    console.error("[ai-generate] Anthropic error:", err);
+    return NextResponse.json({ error: "AI generation failed" }, { status: 500 });
+  }
 }

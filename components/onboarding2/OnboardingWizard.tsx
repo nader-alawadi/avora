@@ -554,6 +554,7 @@ export default function OnboardingWizard() {
   const [answers, setAnswers] = useState<AllAnswers>({});
   const [showConfetti, setShowConfetti] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState("");
   const [logoFile, setLogoFile] = useState<UploadedFile[]>([]);
   const [s8Files, setS8Files] = useState<UploadedFile[]>([]);
   const [s11ProfileFiles, setS11ProfileFiles] = useState<UploadedFile[]>([]);
@@ -664,38 +665,70 @@ export default function OnboardingWizard() {
 
   const handleAI = async (field: string, setFn: (v: string) => void) => {
     setAiLoading((p) => ({ ...p, [field]: true }));
-    const text = await aiGenerate(field, buildContext(), lang);
-    if (text) setFn(text);
-    setAiLoading((p) => ({ ...p, [field]: false }));
+    try {
+      const text = await aiGenerate(field, buildContext(), lang);
+      if (text) setFn(text);
+    } catch (err) {
+      console.error("[handleAI] error for field:", field, err);
+    } finally {
+      setAiLoading((p) => ({ ...p, [field]: false }));
+    }
   };
 
   // ── Final generate ───────────────────────────────────────────────────────────
 
   const handleGenerate = async () => {
     setGenerating(true);
+    setGenerateError("");
+
+    // Save all step answers to the database first
     for (let s = 0; s <= 10; s++) {
       if (answers[s] && Object.keys(answers[s]).length) {
         savingRef.current = false;
         await saveStep(s, answers[s]);
       }
     }
-    setShowConfetti(true);
-    setTimeout(async () => {
-      try {
-        const res = await fetch("/api/reports/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ language: lang }),
-        });
-        if (!res.ok) {
-          console.error("[handleGenerate] failed:", res.status);
-        }
-      } catch (err) {
-        console.error("[handleGenerate] error:", err);
-      } finally {
-        window.location.href = "/dashboard";
+
+    // Call the report generation API
+    try {
+      console.log("[handleGenerate] calling /api/reports/generate...");
+      const res = await fetch("/api/reports/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: lang }),
+      });
+
+      if (!res.ok) {
+        let errMsg = "Report generation failed. Please try again.";
+        try {
+          const data = await res.json();
+          console.error("[handleGenerate] API error:", res.status, data);
+          if (data.error === "REGEN_CREDIT_REQUIRED") {
+            errMsg = lang === "ar"
+              ? "لقد استهلكت حد الإنشاء الشهري. يرجى التواصل مع الدعم."
+              : "You have used your monthly generation credit. Please contact support.";
+          }
+        } catch { /* non-JSON response */ }
+        setGenerateError(errMsg);
+        setGenerating(false);
+        return;
       }
-    }, 2800);
+
+      console.log("[handleGenerate] success — redirecting to dashboard");
+      // Show confetti briefly, then redirect
+      setShowConfetti(true);
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 2800);
+    } catch (err) {
+      console.error("[handleGenerate] network error:", err);
+      setGenerateError(
+        lang === "ar"
+          ? "خطأ في الشبكة. يرجى التحقق من اتصالك والمحاولة مرة أخرى."
+          : "Network error. Please check your connection and try again."
+      );
+      setGenerating(false);
+    }
   };
 
   // ── Step renders ─────────────────────────────────────────────────────────────
@@ -1402,6 +1435,12 @@ export default function OnboardingWizard() {
                 {lang === "ar" ? "Switch to English" : "التبديل إلى العربية"}
               </button>
             </div>
+
+            {generateError && (
+              <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center">
+                {generateError}
+              </div>
+            )}
 
             <div className="pt-2">
               <motion.button
