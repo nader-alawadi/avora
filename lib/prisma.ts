@@ -14,7 +14,12 @@ function createPrismaClient() {
   // ambiguity inside Next.js route handlers. Convert relative → absolute.
   let url = rawUrl;
   if (rawUrl.startsWith("file:") && !rawUrl.startsWith("file:/")) {
-    url = `file:${path.resolve(rawUrl.slice("file:".length))}`;
+    const relativePath = rawUrl.replace(/^file:(\.\/)?/, "");
+    const absolutePath = path.resolve(relativePath);
+    // Normalise Windows backslashes → forward slashes, then use file:/// so the
+    // drive letter (e.g. C:) is not mistaken for a URL scheme by libsql.
+    const normalizedPath = absolutePath.replace(/\\/g, "/");
+    url = `file:///${normalizedPath}`;
   }
 
   const adapter = new PrismaLibSql({ url });
