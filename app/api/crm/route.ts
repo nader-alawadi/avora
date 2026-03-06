@@ -86,7 +86,7 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: any) => {
       const updatedLead = await tx.crmLead.update({
         where: { id },
         data: updateData,

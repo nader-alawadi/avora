@@ -27,7 +27,7 @@ export async function GET() {
       },
     });
 
-    const enriched = members.map((m) => {
+    const enriched = members.map((m: any) => {
       let assignedClientIds: string[] = [];
       try { assignedClientIds = JSON.parse(m.assignedClientIds); } catch { /* */ }
       return { ...m, assignedClientIds };

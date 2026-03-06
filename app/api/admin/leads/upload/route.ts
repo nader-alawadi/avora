@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
     if (crmLeadsCreated.length > 0) {
       await prisma.crmActivity.createMany({
-        data: crmLeadsCreated.map((crmLeadId) => ({
+        data: crmLeadsCreated.map((crmLeadId: any) => ({
           crmLeadId,
           type: "lead_created",
           description: "Lead added to CRM by AVORA team",

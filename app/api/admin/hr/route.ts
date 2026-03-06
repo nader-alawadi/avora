@@ -84,7 +84,7 @@ export async function GET() {
               select: { status: true },
             }),
 
-           (l: any)
+            // All-time delivered leads (excl. Staged)
             prisma.deliveredLead.findMany({
               where: {
                 deliveredByAdminId: member.id,
@@ -112,17 +112,18 @@ export async function GET() {
         // thisMonth stats
 const thisMonthQualified = thisMonthLeads.filter((l: any) => l.status !== "Disputed").length;
 const thisMonthRejected = thisMonthLeads.filter((l: any) => l.status === "Disputed").length;
+const thisMonthTotal = thisMonthLeads.length;
 
         // allTime stats
-        const allTimeQualified = allTimeLeads.filter((l) => l.status !== "Disputed").length;
-        const allTimeRejected = allTimeLeads.filter((l) => l.status === "Disputed").length;
+        const allTimeQualified = allTimeLeads.filter((l: any) => l.status !== "Disputed").length;
+        const allTimeRejected = allTimeLeads.filter((l: any) => l.status === "Disputed").length;
         const allTimeGrossBonus = computeBonus(allTimeQualified, allTimeRejected);
         const totalWithdrawn = approvedWithdrawals._sum.amount ?? 0;
         const availableBalance = allTimeGrossBonus - totalWithdrawn;
 
         // Attendance for this month
         const presentDays = attendanceLogs.filter(
-          (l) => l.status === "Present" || l.status === "Late"
+          (l: any) => l.status === "Present" || l.status === "Late"
         ).length;
         const attendanceRate =
           workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0;

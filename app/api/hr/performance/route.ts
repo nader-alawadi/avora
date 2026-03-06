@@ -119,10 +119,10 @@ export async function GET() {
     // ── thisMonth ────────────────────────────────────────────────────────────
 
     const thisMonthQualified = thisMonthLeads.filter(
-      (l) => l.status !== "Disputed"
+      (l: any) => l.status !== "Disputed"
     ).length;
     const thisMonthRejected = thisMonthLeads.filter(
-      (l) => l.status === "Disputed"
+      (l: any) => l.status === "Disputed"
     ).length;
     const thisMonthTotal = thisMonthLeads.length;
     const thisMonthGrossBonus = computeBonus(thisMonthQualified, thisMonthRejected);
@@ -130,15 +130,15 @@ export async function GET() {
     // Attendance rate for current month
     const workingDays = countWorkingDays(monthStartStr, todayStr);
     const presentCount = attendanceLogs.filter(
-      (l) => l.status === "Present" || l.status === "Late"
+      (l: any) => l.status === "Present" || l.status === "Late"
     ).length;
     const attendanceRate =
       workingDays > 0 ? Math.round((presentCount / workingDays) * 100) : 0;
 
     // ── allTime ──────────────────────────────────────────────────────────────
 
-    const allTimeQualified = allTimeLeads.filter((l) => l.status !== "Disputed").length;
-    const allTimeRejected = allTimeLeads.filter((l) => l.status === "Disputed").length;
+    const allTimeQualified = allTimeLeads.filter((l: any) => l.status !== "Disputed").length;
+    const allTimeRejected = allTimeLeads.filter((l: any) => l.status === "Disputed").length;
     const allTimeGrossBonus = computeBonus(allTimeQualified, allTimeRejected);
     const totalWithdrawn = approvedWithdrawals._sum.amount ?? 0;
     const availableBalance = allTimeGrossBonus - totalWithdrawn;
@@ -190,7 +190,7 @@ export async function GET() {
 
     const performanceLog = Array.from(groupMap.values())
       .sort((a, b) => a.date.localeCompare(b.date))
-      .map((g) => ({
+      .map((g: any) => ({
         ...g,
         bonusEarned: computeBonus(g.qualified, g.rejected),
       }));

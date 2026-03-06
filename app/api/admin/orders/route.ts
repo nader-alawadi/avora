@@ -45,9 +45,9 @@ export async function GET() {
 
     // Annotate each order with a derived flag so the delivery panel can surface
     // "Delivered" orders that still have disputed leads needing replacement.
-    const annotated = orders.map((o) => ({
+    const annotated = orders.map((o: any) => ({
       ...o,
-      needsReplacement: o.deliveredLeads.some((l) => l.status === "Disputed"),
+      needsReplacement: o.deliveredLeads.some((l: any) => l.status === "Disputed"),
     }));
 
     return NextResponse.json({ orders: annotated });

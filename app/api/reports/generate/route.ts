@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     // req.json() throws on empty body — handle gracefully
     let language: string | undefined;
-    let forceMode: string | undefined;
+    let forceMode: "strict" | "balanced" | undefined;
     try {
       const body = await req.json();
       language = body.language;

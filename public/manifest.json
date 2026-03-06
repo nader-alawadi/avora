@@ -1,0 +1,17 @@
+{
+  "name": "AVORA — GTM & Sales Strategy",
+  "short_name": "AVORA",
+  "description": "AI-powered Go-To-Market strategy platform by Enigma Sales",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1F2A2A",
+  "icons": [
+    {
+      "src": "/avora-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
