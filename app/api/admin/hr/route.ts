@@ -84,7 +84,7 @@ export async function GET() {
               select: { status: true },
             }),
 
-            // All-time delivered leads (excl. Staged)
+           (l: any)
             prisma.deliveredLead.findMany({
               where: {
                 deliveredByAdminId: member.id,
