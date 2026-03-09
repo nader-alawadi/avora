@@ -1,14 +1,16 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { AvoraLogo } from "@/components/ui/AvoraLogo";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -39,7 +41,7 @@ export default function LoginPage() {
       if (data.user.isAdmin) {
         router.push("/admin");
       } else {
-        router.push("/dashboard");
+        router.push(nextUrl);
       }
     } catch {
       setError("Network error. Please try again.");
@@ -206,5 +208,13 @@ export default function LoginPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
