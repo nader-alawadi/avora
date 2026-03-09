@@ -399,6 +399,33 @@ function ARIABubble({ text, dir }: { text: string; dir: "ltr" | "rtl" }) {
   );
 }
 
+// ─── Derive current ARIA message from phase ──────────────────────────────────
+// Used both for initial render and when the user switches language.
+
+function getCurrentMessage(
+  phase: Phase,
+  lang: "ar" | "en",
+  userName: string,
+  websiteData: WebsiteData | null
+): string {
+  const t = T[lang];
+  switch (phase) {
+    case "welcome":
+    case "url-input":
+      return t.welcome(userName);
+    case "analyzing":
+      return t.analyzing;
+    case "confirm-analysis":
+      if (!websiteData) return t.analyzing;
+      return `${t.confirmPrefix} "${websiteData.productDescription}" ${t.confirmMid} "${websiteData.targetMarket}"${t.confirmSuffix}`;
+    case "generating-leads":
+    case "show-leads":
+      return t.giftAnnounce;
+    default:
+      return "";
+  }
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function ARIAOnboardingPage() {
@@ -406,8 +433,6 @@ export default function ARIAOnboardingPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // lang starts as "en" for SSR/hydration consistency.
-  // It is updated synchronously at the very start of the initialization effect —
-  // before any speech or UI transitions fire — so the user always sees the correct language.
   const [lang, setLang] = useState<"ar" | "en">("en");
   const [ariaState, setAriaState] = useState<ARIAState>("idle");
   const [phase, setPhase] = useState<Phase>("welcome");
@@ -418,22 +443,43 @@ export default function ARIAOnboardingPage() {
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
   const [leads, setLeads] = useState<ARIALead[]>([]);
 
+  // Keep a ref to latest phase/websiteData/userName so the toggle handler
+  // can read the current values without going stale inside a closure.
+  const phaseRef = useRef(phase);
+  const websiteDataRef = useRef(websiteData);
+  const userNameRef = useRef(userName);
+  phaseRef.current = phase;
+  websiteDataRef.current = websiteData;
+  userNameRef.current = userName;
+
   const t = T[lang];
 
+  // ── Language toggle ───────────────────────────────────────────────────────
+  function handleLangToggle() {
+    const newLang = lang === "ar" ? "en" : "ar";
+    setLang(newLang);
+
+    // Re-translate the current ARIA message instantly
+    const msg = getCurrentMessage(
+      phaseRef.current,
+      newLang,
+      userNameRef.current,
+      websiteDataRef.current
+    );
+    setAriaMessage(msg);
+
+    // Re-speak in the new language (non-blocking)
+    if (msg) {
+      setAriaState("speaking");
+      ariaSpeak(msg, newLang, audioRef.current).then(() => {
+        setAriaState(phaseRef.current === "url-input" ? "listening" : "idle");
+      });
+    }
+  }
+
   // ── Single initialization effect ──────────────────────────────────────────
-  //
-  // Correct pattern (per bug report):
-  //   1. Detect language SYNCHRONOUSLY (navigator is always available in useEffect)
-  //   2. setLang() immediately so the next render uses the right translations
-  //   3. Fetch user name (async)
-  //   4. ONLY THEN trigger the welcome speech — with the right lang + name
-  //
-  // This ensures the welcome message is NEVER in the wrong language.
-  //
   useEffect(() => {
-    // Step 1 — synchronous language detection
-    // Check navigator.language AND the full navigator.languages array so we
-    // catch Arabic even when it's not the primary browser language.
+    // Detect language — check full navigator.languages array
     const allLangs = [
       navigator.language ?? "",
       ...(navigator.languages ?? []),
@@ -445,8 +491,7 @@ export default function ARIAOnboardingPage() {
       : "en";
     setLang(detectedLang);
 
-    // Step 2 — fetch user name, then speak welcome
-    const translations = T[detectedLang]; // captured in closure, never stale
+    const translations = T[detectedLang];
 
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -456,7 +501,6 @@ export default function ARIAOnboardingPage() {
         const firstName = fullName ? fullName.split(" ")[0] : "";
         setUserName(firstName);
 
-        // Step 3 — build and speak welcome in the correct language
         const msg = translations.welcome(firstName);
         setAriaMessage(msg);
         setAriaState("speaking");
@@ -555,10 +599,10 @@ export default function ARIAOnboardingPage() {
       <div className="flex items-center justify-between px-6 py-4 border-b border-teal-900/40">
         <div className="text-white/40 text-sm">AVORA</div>
         <button
-          onClick={() => setLang((l) => (l === "ar" ? "en" : "ar"))}
-          className="text-xs text-white/40 hover:text-white/70 px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20 transition-colors"
+          onClick={handleLangToggle}
+          className="text-sm font-semibold text-teal-300 hover:text-white px-4 py-2 rounded-xl border border-teal-600/50 hover:border-teal-400 bg-teal-900/30 hover:bg-teal-800/40 transition-all"
         >
-          {lang === "ar" ? "English" : "العربية"}
+          {lang === "ar" ? "🌐 English" : "🌐 العربية"}
         </button>
       </div>
 
