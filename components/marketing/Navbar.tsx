@@ -350,11 +350,13 @@ function NavLink({
   onMegaOpen,
   onMegaClose,
   isMegaOpen,
+  textColor,
 }: {
   item: NavItem;
   onMegaOpen: () => void;
   onMegaClose: () => void;
   isMegaOpen: boolean;
+  textColor: string;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -377,7 +379,7 @@ function NavLink({
         style={{
           fontSize: "15px",
           fontWeight: 500,
-          color: "#0A1628",
+          color: textColor,
           textDecoration: "none",
           padding: "8px 4px",
           display: "flex",
@@ -431,6 +433,9 @@ export default function Navbar() {
   const [lang, setLang] = useState<"EN" | "AR">("EN");
   const megaRef = useRef<HTMLDivElement>(null);
   const megaTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const textColor = scrolled ? "#0A1628" : "#ffffff";
+  const borderColor = scrolled ? "#E5E7EB" : "rgba(255,255,255,0.4)";
 
   useEffect(() => {
     const stored = localStorage.getItem("avora-lang");
@@ -499,7 +504,19 @@ export default function Navbar() {
         >
           {/* Logo */}
           <Link href="/" style={{ textDecoration: "none", flexShrink: 0 }}>
-            <AvoraLogo />
+            <span
+              style={{
+                fontFamily: "Inter, sans-serif",
+                fontWeight: 800,
+                fontSize: "24px",
+                letterSpacing: "-0.5px",
+                color: scrolled ? "#14B8A6" : "#ffffff",
+                userSelect: "none",
+              }}
+            >
+              AV<span style={{ color: scrolled ? "#14B8A6" : "#ffffff" }}>O</span>R
+              <span style={{ color: "#F97316" }}>•</span>A
+            </span>
           </Link>
 
           {/* Desktop nav links */}
@@ -520,6 +537,7 @@ export default function Navbar() {
                 onMegaOpen={handleMegaOpen}
                 onMegaClose={handleMegaClose}
                 isMegaOpen={item.hasMega ? megaOpen : false}
+                textColor={textColor}
               />
             ))}
 
@@ -559,13 +577,13 @@ export default function Navbar() {
                 cursor: "pointer",
                 fontSize: "13px",
                 fontWeight: 600,
-                color: "#0A1628",
+                color: textColor,
                 borderRadius: "8px",
                 transition: "background 0.15s",
                 fontFamily: "Inter, sans-serif",
               }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#F3F4F6")
+                (e.currentTarget.style.background = scrolled ? "#F3F4F6" : "rgba(255,255,255,0.15)")
               }
               onMouseLeave={(e) =>
                 (e.currentTarget.style.background = "transparent")
@@ -582,9 +600,9 @@ export default function Navbar() {
                 padding: "8px 16px",
                 fontSize: "14px",
                 fontWeight: 600,
-                color: "#0A1628",
+                color: textColor,
                 textDecoration: "none",
-                border: "1.5px solid #E5E7EB",
+                border: `1.5px solid ${borderColor}`,
                 borderRadius: "10px",
                 transition: "border-color 0.15s, color 0.15s",
                 background: "transparent",
@@ -592,14 +610,12 @@ export default function Navbar() {
                 alignItems: "center",
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor =
-                  "#14B8A6";
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = "#14B8A6";
                 (e.currentTarget as HTMLAnchorElement).style.color = "#14B8A6";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor =
-                  "#E5E7EB";
-                (e.currentTarget as HTMLAnchorElement).style.color = "#0A1628";
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = borderColor;
+                (e.currentTarget as HTMLAnchorElement).style.color = textColor;
               }}
             >
               Sign In
