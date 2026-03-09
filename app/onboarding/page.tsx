@@ -1,5 +1,6 @@
-import OnboardingWizard from "@/components/onboarding2/OnboardingWizard";
+import { redirect } from "next/navigation";
 
+// Old onboarding route → redirect to new ARIA-powered onboarding
 export default function OnboardingPage() {
-  return <OnboardingWizard />;
+  redirect("/onboarding/aria");
 }

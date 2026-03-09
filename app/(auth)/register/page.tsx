@@ -43,7 +43,7 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/onboarding");
+      router.push("/onboarding/aria");
     } catch {
       setError("Network error. Please try again.");
     } finally {
