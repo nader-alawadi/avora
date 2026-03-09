@@ -57,10 +57,18 @@ export function createToken(payload: JWTPayload): string {
 
 // ── Session resolution ────────────────────────────────────────────────────────
 
-export async function getSession(_req?: NextRequest): Promise<SessionUser | null> {
+export async function getSession(req?: NextRequest): Promise<SessionUser | null> {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("avora-token")?.value;
+    // When a NextRequest is available, read cookies directly from the request's
+    // Cookie header — this is reliable in all Route Handler contexts.
+    // Fall back to next/headers cookies() for Server Components / Server Actions.
+    let token: string | undefined;
+    if (req) {
+      token = req.cookies.get("avora-token")?.value;
+    } else {
+      const cookieStore = await cookies();
+      token = cookieStore.get("avora-token")?.value;
+    }
     if (!token) return null;
 
     const decoded = verify(token, JWT_SECRET) as JWTPayload & { userId?: string };
@@ -148,8 +156,8 @@ export async function getSession(_req?: NextRequest): Promise<SessionUser | null
 
 // ── Auth guards ───────────────────────────────────────────────────────────────
 
-export async function requireAuth(_req?: NextRequest): Promise<SessionUser> {
-  const session = await getSession(_req);
+export async function requireAuth(req?: NextRequest): Promise<SessionUser> {
+  const session = await getSession(req);
   if (!session) throw new Error("Unauthorized");
   return session;
 }

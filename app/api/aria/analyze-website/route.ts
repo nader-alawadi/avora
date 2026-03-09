@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
 import { requireAnthropicClient } from "@/lib/anthropic-client";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) {
+  let session;
+  try {
+    session = await requireAuth(req);
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
