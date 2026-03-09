@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, SessionUser } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { requireAnthropicClient } from "@/lib/anthropic-client";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
-  let session;
-  try {
-    session = await requireAuth(req);
-  } catch {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -121,7 +119,7 @@ If you cannot determine something from the content, make a reasonable inference 
     }
 
     // Save to AriaSession
-    const userId = (session as SessionUser).id;
+    const userId = session.id;
     await prisma.ariaSession.upsert({
       where: { userId },
       create: {
