@@ -6,8 +6,7 @@ const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 const MODEL_ID = "eleven_multilingual_v2";
 
 // Voices from "My Voices" in the ElevenLabs account
-const ARABIC_VOICE_ID = "L10lEremDiJfPicq5CPh";  // Yasmine — professional female Arabic
-const ARABIC_VOICE_FALLBACK = "4wf10lgibMnboGJGCLrP"; // Farah — fallback Arabic
+const ARABIC_VOICE_ID = "4wf10lgibMnboGJGCLrP";  // Farah — Arabic female
 const ENGLISH_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah — premade female English
 
 const VOICE_SETTINGS = {
@@ -63,12 +62,6 @@ export async function POST(req: NextRequest) {
   try {
     let upstream = await callStream(text, primaryVoice);
     console.log(`[speak] ElevenLabs /stream response: ${upstream.status}`);
-
-    if (!upstream.ok && language === "ar") {
-      console.warn(`[speak] Yasmine failed (${upstream.status}), trying Farah fallback`);
-      upstream = await callStream(text, ARABIC_VOICE_FALLBACK);
-      console.log(`[speak] Farah fallback response: ${upstream.status}`);
-    }
 
     if (!upstream.ok) {
       const errBody = await upstream.text().catch(() => "");
