@@ -1,648 +1,1181 @@
 "use client";
+
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { motion, useInView, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import { AvoraLogo } from "@/components/ui/AvoraLogo";
 
-/* ── Animation variants ─────────────────────────────────────── */
-const fadeUp = {
-  hidden: { opacity: 0, y: 32 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
-  }),
-};
+// ─── Particles ───────────────────────────────────────────────────────────────
+const particles = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  x: (i * 37 + 13) % 100,
+  y: (i * 53 + 7) % 100,
+  size: (i % 3) + 2,
+}));
 
-const stagger = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.1 } },
-};
-
-/* ── Animated counter ───────────────────────────────────────── */
-function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: string }) {
-  const [current, setCurrent] = useState(0);
+// ─── CountUp Component ────────────────────────────────────────────────────────
+function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
+  const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
 
   useEffect(() => {
     if (!inView) return;
+    let start = 0;
     const duration = 2000;
-    const steps = 60;
-    const increment = target / steps;
-    let count = 0;
+    const increment = target / (duration / 16);
     const timer = setInterval(() => {
-      count += increment;
-      if (count >= target) { setCurrent(target); clearInterval(timer); return; }
-      setCurrent(Math.floor(count));
-    }, duration / steps);
+      start += increment;
+      if (start >= target) {
+        setCount(target);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(start));
+      }
+    }, 16);
     return () => clearInterval(timer);
   }, [inView, target]);
 
-  return <span ref={ref}>{current.toLocaleString()}{suffix}</span>;
-}
-
-/* ── Navbar ─────────────────────────────────────────────────── */
-function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handler, { passive: true });
-    return () => window.removeEventListener("scroll", handler);
-  }, []);
-
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "bg-white/95 backdrop-blur-xl border-b border-[#D5ECEC] shadow-sm"
-          : "bg-transparent"
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-        {/* Logo */}
-        <Link href="/" aria-label="AVORA home">
-          <AvoraLogo
-            size={34}
-            showTagline
-            textColor={scrolled ? undefined : "white"}
-            taglineColor={scrolled ? undefined : "rgba(255,255,255,0.5)"}
-          />
-        </Link>
-
-        {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-8">
-          {[
-            { label: "Features", href: "#features" },
-            { label: "How It Works", href: "#how-it-works" },
-            { label: "Pricing", href: "#pricing" },
-            { label: "Contact", href: "/contact" },
-          ].map((item) => (
-            <a
-              key={item.label}
-              href={item.href}
-              className={`text-sm font-medium transition-colors relative group ${
-                scrolled ? "text-[#4A6B6B] hover:text-[#1A6B6B]" : "text-white/80 hover:text-white"
-              }`}
-            >
-              {item.label}
-              <span className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-[#FF5252] group-hover:w-full transition-all duration-300 rounded-full" />
-            </a>
-          ))}
-        </div>
-
-        {/* Desktop CTA */}
-        <div className="hidden md:flex items-center gap-3">
-          <Link
-            href="/login"
-            className={`text-sm font-semibold transition-colors ${
-              scrolled ? "text-[#4A6B6B] hover:text-[#1A6B6B]" : "text-white/90 hover:text-white"
-            }`}
-          >
-            Sign In
-          </Link>
-          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Link
-              href="/register"
-              className="bg-[#FF5252] hover:bg-[#E04545] text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors btn-glow-coral shadow-lg"
-            >
-              Get Started Free
-            </Link>
-          </motion.div>
-        </div>
-
-        {/* Mobile menu button */}
-        <button
-          className="md:hidden p-2 rounded-lg"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Toggle menu"
-        >
-          <div className={`w-5 h-0.5 mb-1 transition-all ${scrolled ? "bg-[#1A2E2E]" : "bg-white"} ${mobileOpen ? "rotate-45 translate-y-1.5" : ""}`} />
-          <div className={`w-5 h-0.5 mb-1 transition-all ${scrolled ? "bg-[#1A2E2E]" : "bg-white"} ${mobileOpen ? "opacity-0" : ""}`} />
-          <div className={`w-5 h-0.5 transition-all ${scrolled ? "bg-[#1A2E2E]" : "bg-white"} ${mobileOpen ? "-rotate-45 -translate-y-1.5" : ""}`} />
-        </button>
-      </div>
-
-      {/* Mobile menu */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white border-t border-[#D5ECEC] px-4 py-6 space-y-4"
-          >
-            {["Features", "How It Works", "Pricing", "Contact"].map((item) => (
-              <a
-                key={item}
-                href={`#${item.toLowerCase().replace(/\s+/g, "-")}`}
-                className="block text-[#4A6B6B] font-medium hover:text-[#1A6B6B] transition-colors"
-                onClick={() => setMobileOpen(false)}
-              >
-                {item}
-              </a>
-            ))}
-            <div className="pt-4 flex flex-col gap-3">
-              <Link href="/login" className="text-center py-2.5 text-[#4A6B6B] font-semibold border border-[#9BCECE] rounded-xl">Sign In</Link>
-              <Link href="/register" className="text-center py-2.5 bg-[#FF5252] text-white font-semibold rounded-xl">Get Started Free</Link>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
+    <span ref={ref}>
+      {count}
+      {suffix}
+    </span>
   );
 }
 
-/* ── Main landing page ──────────────────────────────────────── */
+// ─── Nav Link with animated underline ─────────────────────────────────────────
+function NavLink({
+  href,
+  children,
+  scrolled,
+}: {
+  href: string;
+  children: React.ReactNode;
+  scrolled: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="relative text-sm font-medium transition-colors duration-200 group"
+      style={{ color: scrolled ? "#475569" : "rgba(255,255,255,0.85)" }}
+    >
+      {children}
+      <span
+        style={{
+          position: "absolute",
+          bottom: -2,
+          left: 0,
+          height: 2,
+          width: 0,
+          background: "#14B8A6",
+          borderRadius: 2,
+          transition: "width 0.3s ease",
+        }}
+        className="group-hover:w-full"
+      />
+    </Link>
+  );
+}
+
+// ─── Feature Cards ────────────────────────────────────────────────────────────
+const featureCardVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const features = [
+  {
+    icon: "🎯",
+    title: "AI-Powered ICP Builder",
+    desc: "Define your ideal customer profile with AI in minutes. ARIA analyzes your business and builds a precision ICP.",
+  },
+  {
+    icon: "🔍",
+    title: "Smart Lead Discovery",
+    desc: "Find verified decision-makers across 150+ countries with 94% email accuracy guaranteed.",
+  },
+  {
+    icon: "📊",
+    title: "GTM Strategy Engine",
+    desc: "Get a complete go-to-market playbook tailored to your business, generated by AI in seconds.",
+  },
+  {
+    icon: "🤖",
+    title: "ARIA AI Assistant",
+    desc: "Your personal AI sales coach guides you every step of the way — from ICP to closed deal.",
+  },
+  {
+    icon: "📈",
+    title: "ABM Campaign Builder",
+    desc: "Target accounts with precision using AI-driven insights and automated multi-channel outreach.",
+  },
+  {
+    icon: "🔗",
+    title: "CRM Auto-Sync",
+    desc: "Leads flow directly into your pipeline, enriched and ready to close. Works with HubSpot, Salesforce & more.",
+  },
+];
+
+// ─── Integrations ─────────────────────────────────────────────────────────────
+const integrations = [
+  { name: "HubSpot", color: "#FF7A59", letter: "H" },
+  { name: "Salesforce", color: "#00A1E0", letter: "S" },
+  { name: "LinkedIn", color: "#0A66C2", letter: "in" },
+  { name: "WhatsApp", color: "#25D366", letter: "W" },
+  { name: "Slack", color: "#4A154B", letter: "S" },
+  { name: "Gmail", color: "#EA4335", letter: "G" },
+  { name: "Zapier", color: "#FF4A00", letter: "Z" },
+  { name: "Pipedrive", color: "#1A6B3C", letter: "P" },
+  { name: "Notion", color: "#1A1A1A", letter: "N" },
+  { name: "Stripe", color: "#635BFF", letter: "S" },
+];
+
+// ─── Testimonials ─────────────────────────────────────────────────────────────
+const testimonials = [
+  {
+    name: "John Smith",
+    role: "VP Sales",
+    company: "TechCorp",
+    initial: "J",
+    color: "#14B8A6",
+    quote:
+      "AVORA cut our sales cycle in half. The AI-generated leads are incredibly accurate — 90% conversion to meetings.",
+  },
+  {
+    name: "Sarah Chen",
+    role: "Growth Lead",
+    company: "StartupXYZ",
+    initial: "S",
+    color: "#F97316",
+    quote:
+      "The GTM strategy ARIA generated for us was more detailed than anything our consultants produced. Game-changer.",
+  },
+  {
+    name: "Ahmed Hassan",
+    role: "CEO",
+    company: "ScaleUp MENA",
+    initial: "A",
+    color: "#8B5CF6",
+    quote:
+      "Finally a platform that understands B2B sales in the Arab world. The Arabic support is flawless.",
+  },
+];
+
+// ─── Pricing plans ────────────────────────────────────────────────────────────
+const pricingPlans = [
+  {
+    name: "Starter",
+    price: 0 as number | null,
+    for: "Small teams just getting started",
+    cta: "Start Free",
+    ctaVariant: "outline-teal",
+    href: "/register",
+    features: [
+      "5 Free Leads/month",
+      "Basic ICP Builder",
+      "ARIA AI Chat (limited)",
+      "1 GTM Report/month",
+      "Email Support",
+    ],
+    highlight: false,
+    badge: null as string | null,
+  },
+  {
+    name: "Growth",
+    price: 149 as number | null,
+    for: "Growing sales teams",
+    cta: "Start Growth",
+    ctaVariant: "coral",
+    href: "/register?plan=growth",
+    features: [
+      "50 Leads/month",
+      "Advanced ICP + ABM",
+      "Full ARIA AI Assistant",
+      "5 GTM Reports/month",
+      "CRM Auto-Sync",
+      "Priority Support",
+    ],
+    highlight: true,
+    badge: "Most Popular",
+  },
+  {
+    name: "Enterprise",
+    price: null as number | null,
+    for: "Large organizations",
+    cta: "Contact Sales",
+    ctaVariant: "navy",
+    href: "/contact",
+    features: [
+      "Unlimited Leads",
+      "Custom ICP Models",
+      "Dedicated ARIA Instance",
+      "Unlimited Reports",
+      "Custom Integrations",
+      "24/7 SLA Support",
+      "Custom Contracts",
+    ],
+    highlight: false,
+    badge: null as string | null,
+  },
+];
+
+// ─── Footer columns ────────────────────────────────────────────────────────────
+const footerColumns = [
+  {
+    title: "Product",
+    links: ["Features", "ICP Builder", "Lead Discovery", "GTM Strategy", "ARIA AI", "Pricing"],
+  },
+  {
+    title: "Solutions",
+    links: ["Sales Teams", "Growth Teams", "Founders", "Enterprise", "Agencies"],
+  },
+  {
+    title: "Company",
+    links: ["About", "Careers", "Blog", "Press", "Contact"],
+  },
+  {
+    title: "Legal",
+    links: ["Privacy Policy", "Terms of Service", "GDPR", "Security"],
+  },
+];
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function LandingPage() {
-  const features = [
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
-        </svg>
-      ),
-      title: "Ideal Customer Profile (ICP)",
-      desc: "AI-generated ICP with firmographics, psychographics, buying triggers, and disqualifiers based on your real customer evidence.",
-      iconBg: "bg-[#1A6B6B]",
-      cardBg: "bg-[#EFF6F6]",
-      border: "border-[#D5ECEC]",
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-        </svg>
-      ),
-      title: "Decision Making Unit (DMU) Map",
-      desc: "Map every stakeholder in the buying process — economic buyer, champion, technical buyer — with engagement strategies.",
-      iconBg: "bg-[#2D8080]",
-      cardBg: "bg-[#EFF6F6]",
-      border: "border-[#D5ECEC]",
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-        </svg>
-      ),
-      title: "ABM Targeting Strategy",
-      desc: "Account-based marketing with Tier 1, 2, and 3 segmentation and prioritization frameworks for maximum ROI.",
-      iconBg: "bg-[#FF5252]",
-      cardBg: "bg-[#FFF5F5]",
-      border: "border-[#FFD5D5]",
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-      ),
-      title: "Outreach Playbook",
-      desc: "LinkedIn, Email, and WhatsApp outreach sequences with messaging frameworks tailored precisely to your ICP.",
-      iconBg: "bg-[#1A6B6B]",
-      cardBg: "bg-[#EFF6F6]",
-      border: "border-[#D5ECEC]",
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      ),
-      title: "Lookalike Search Criteria",
-      desc: "Boolean search strings and criteria to find accounts that match your best customers — no personal data exposed.",
-      iconBg: "bg-[#2D8080]",
-      cardBg: "bg-[#EFF6F6]",
-      border: "border-[#D5ECEC]",
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      title: "Leads Dashboard",
-      desc: "Order targeted leads delivered by the Enigma Sales team with full CRM data and personality analysis links.",
-      iconBg: "bg-[#1A6B6B]",
-      cardBg: "bg-[#EFF6F6]",
-      border: "border-[#D5ECEC]",
-    },
-  ];
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isRTL, setIsRTL] = useState(false);
+  const [annual, setAnnual] = useState(false);
 
-  const stats = [
-    { value: 500, suffix: "+", label: "Businesses Using AVORA" },
-    { value: 95, suffix: "%", label: "Strategy Accuracy" },
-    { value: 7, suffix: " days", label: "Lead Delivery Time" },
-    { value: 2, suffix: " languages", label: "EN & Arabic Support" },
-  ];
+  useEffect(() => {
+    setIsRTL(navigator.language.startsWith("ar"));
+  }, []);
 
-  const steps = [
-    {
-      n: "01",
-      title: "Sign Up & Set Language",
-      desc: "Create your account in seconds and choose English or Arabic as your preferred language.",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
-    },
-    {
-      n: "02",
-      title: "Complete Onboarding",
-      desc: "Answer 6 structured questions about your business, best customers, and GTM process.",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-        </svg>
-      ),
-    },
-    {
-      n: "03",
-      title: "AI Generates Your Strategy",
-      desc: "AVORA analyzes your input and generates ICP, DMU, ABM, and Outreach assets in minutes.",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-    },
-    {
-      n: "04",
-      title: "Export & Request Leads",
-      desc: "Download branded PDFs and order targeted leads delivered within 7 business days.",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
-      ),
-    },
-  ];
-
-  const testimonials = [
-    {
-      quote: "AVORA transformed how we approach B2B sales. The ICP and DMU mapping saved us weeks of research and our outreach response rates tripled.",
-      name: "Sarah K.",
-      role: "VP of Sales",
-      company: "TechCorp MENA",
-      initials: "SK",
-      color: "bg-[#1A6B6B]",
-    },
-    {
-      quote: "The AI-generated outreach sequences are incredibly precise. We closed 3 enterprise deals in the first month after implementing AVORA's strategy.",
-      name: "Ahmed M.",
-      role: "Founder & CEO",
-      company: "GrowthLab",
-      initials: "AM",
-      color: "bg-[#2D8080]",
-    },
-    {
-      quote: "Best investment for our GTM team. The Arabic support made it accessible to our entire team and the lead quality is exceptional.",
-      name: "Layla R.",
-      role: "Marketing Director",
-      company: "Apex Solutions",
-      initials: "LR",
-      color: "bg-[#FF5252]",
-    },
-  ];
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
+    <div dir={isRTL ? "rtl" : "ltr"} style={{ minHeight: "100vh", overflowX: "hidden", fontFamily: "Inter, Nunito, sans-serif" }}>
 
-      {/* ── Hero ────────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex items-center overflow-hidden gradient-hero">
-        {/* Gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#2D8080]/20 rounded-full blur-3xl float-orb pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#FF5252]/10 rounded-full blur-3xl float-orb-delayed pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#2D8080]/05 rounded-full blur-3xl pointer-events-none" />
+      {/* ── GLOBAL STYLES ─────────────────────────────────────── */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        @keyframes gradientShift {
+          0%   { background-position: 0% 50%; }
+          50%  { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes marquee {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .marquee-track { animation: marquee 22s linear infinite; }
+        .nav-link-underline { position: absolute; bottom: -2px; left: 0; height: 2px; width: 0; background: #14B8A6; border-radius: 2px; transition: width 0.3s ease; }
+        a:hover .nav-link-underline { width: 100%; }
+      `}</style>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={stagger}
-            className="text-center max-w-5xl mx-auto"
-          >
-            {/* Badge */}
-            <motion.div variants={fadeUp} custom={0} className="mb-8">
-              <span className="inline-flex items-center gap-2 glass-navy text-white/90 text-xs font-semibold px-4 py-2 rounded-full border border-white/10">
-                <span className="w-1.5 h-1.5 bg-[#FF5252] rounded-full animate-pulse" />
-                AI-Powered GTM Strategy Platform
-              </span>
-            </motion.div>
+      {/* ══════════════════════════════════════════════════════════
+          1. STICKY NAVIGATION
+      ══════════════════════════════════════════════════════════ */}
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          background: scrolled ? "rgba(255,255,255,0.95)" : "transparent",
+          backdropFilter: scrolled ? "blur(12px)" : "none",
+          WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
+          boxShadow: scrolled ? "0 1px 24px rgba(0,0,0,0.08)" : "none",
+          transition: "background 0.3s, box-shadow 0.3s",
+        }}
+      >
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
+            {/* Logo */}
+            <Link href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}>
+              <AvoraLogo variant={scrolled ? "dark" : "light"} height={32} />
+            </Link>
 
-            {/* Headline */}
-            <motion.h1
-              variants={fadeUp}
-              custom={1}
-              className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-white leading-[1.05] tracking-tight mb-6"
-              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
+            {/* Desktop Nav */}
+            <nav style={{ display: "flex", alignItems: "center", gap: 32 }} className="hidden md:flex">
+              {["Product", "Solutions", "Pricing", "Resources", "Customers"].map((item) => (
+                <NavLink key={item} href={`#${item.toLowerCase()}`} scrolled={scrolled}>
+                  {item}
+                </NavLink>
+              ))}
+            </nav>
+
+            {/* Desktop CTAs */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }} className="hidden md:flex">
+              <Link
+                href="/login"
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  padding: "8px 16px",
+                  borderRadius: 10,
+                  border: scrolled ? "1px solid #E2E8F0" : "1px solid rgba(255,255,255,0.3)",
+                  color: scrolled ? "#475569" : "white",
+                  textDecoration: "none",
+                  transition: "all 0.2s",
+                }}
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  padding: "8px 20px",
+                  borderRadius: 10,
+                  background: "#F97316",
+                  color: "white",
+                  textDecoration: "none",
+                  transition: "all 0.2s",
+                  boxShadow: "0 4px 16px rgba(249,115,22,0.35)",
+                }}
+              >
+                Start Free
+              </Link>
+            </div>
+
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Toggle navigation"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", flexDirection: "column", gap: 5 }}
+              className="md:hidden"
             >
-              Your GTM Strategy,{" "}
-              <br className="hidden md:block" />
-              <span className="hero-gradient-text">Built by AI</span> in Minutes
-            </motion.h1>
-
-            {/* Subtext */}
-            <motion.p
-              variants={fadeUp}
-              custom={2}
-              className="text-xl text-white/65 max-w-2xl mx-auto leading-relaxed mb-10"
-            >
-              AVORA interviews your business, analyzes your best customers, and generates
-              a complete go-to-market strategy — ICP, DMU Map, ABM Playbook, and Outreach sequences.
-            </motion.p>
-
-            {/* CTAs */}
-            <motion.div
-              variants={fadeUp}
-              custom={3}
-              className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
-            >
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link
-                  href="/register"
-                  className="inline-flex items-center gap-2 bg-[#FF5252] hover:bg-[#E04545] text-white font-bold px-8 py-4 rounded-2xl text-lg transition-colors btn-glow-coral shadow-xl"
-                >
-                  Get Your Strategy Free
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </Link>
-              </motion.div>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 glass-navy text-white/90 hover:text-white font-bold px-8 py-4 rounded-2xl text-lg transition-all border border-white/15 hover:border-white/25"
-                >
-                  Sign In
-                </Link>
-              </motion.div>
-            </motion.div>
-
-            {/* Trust line */}
-            <motion.p variants={fadeUp} custom={4} className="text-sm text-white/35">
-              Free to start · No credit card required · English & Arabic supported
-            </motion.p>
-          </motion.div>
-
-          {/* Hero stats preview */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto"
-          >
-            {stats.map((stat, i) => (
-              <div key={i} className="glass-navy rounded-2xl p-5 text-center border border-white/10">
-                <div className="text-3xl font-extrabold text-white mb-1">
-                  <AnimatedNumber target={stat.value} suffix={stat.suffix} />
-                </div>
-                <div className="text-xs text-white/45 font-medium">{stat.label}</div>
-              </div>
-            ))}
-          </motion.div>
+              {[0, 1, 2].map((n) => (
+                <span
+                  key={n}
+                  style={{
+                    display: "block",
+                    width: 24,
+                    height: 2,
+                    borderRadius: 2,
+                    background: scrolled ? "#0A1628" : "white",
+                    transition: "all 0.3s",
+                    transform:
+                      n === 0 && mobileOpen
+                        ? "rotate(45deg) translate(5px, 5px)"
+                        : n === 2 && mobileOpen
+                        ? "rotate(-45deg) translate(5px, -5px)"
+                        : "none",
+                    opacity: n === 1 && mobileOpen ? 0 : 1,
+                  }}
+                />
+              ))}
+            </button>
+          </div>
         </div>
 
-        {/* Wave divider */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 80" className="w-full" fill="white" preserveAspectRatio="none">
-            <path d="M0,80 C360,20 1080,60 1440,30 L1440,80 Z" />
-          </svg>
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {mobileOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              style={{ background: "white", borderTop: "1px solid #E2E8F0", overflow: "hidden" }}
+              className="md:hidden"
+            >
+              <div style={{ padding: "24px" }}>
+                {["Product", "Solutions", "Pricing", "Resources", "Customers"].map((item, i) => (
+                  <motion.div
+                    key={item}
+                    initial={{ opacity: 0, x: -16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                  >
+                    <Link
+                      href={`#${item.toLowerCase()}`}
+                      onClick={() => setMobileOpen(false)}
+                      style={{
+                        display: "block",
+                        padding: "12px 0",
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: "#0A1628",
+                        textDecoration: "none",
+                        borderBottom: "1px solid #F1F5F9",
+                      }}
+                    >
+                      {item}
+                    </Link>
+                  </motion.div>
+                ))}
+                <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <Link href="/login" style={{ textAlign: "center", padding: "12px", border: "1px solid #E2E8F0", borderRadius: 12, color: "#475569", textDecoration: "none", fontWeight: 500 }}>
+                    Sign In
+                  </Link>
+                  <Link href="/register" style={{ textAlign: "center", padding: "12px", background: "#F97316", borderRadius: 12, color: "white", textDecoration: "none", fontWeight: 600 }}>
+                    Start Free
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      {/* ══════════════════════════════════════════════════════════
+          2. HERO SECTION
+      ══════════════════════════════════════════════════════════ */}
+      <section
+        id="product"
+        style={{
+          background: "linear-gradient(135deg, #0A1628 0%, #0D3D3D 50%, #0A1628 100%)",
+          position: "relative",
+          overflow: "hidden",
+          paddingTop: "6rem",
+          paddingBottom: "6rem",
+        }}
+      >
+        {/* Orb 1 — teal top-left */}
+        <motion.div
+          animate={{ y: [-30, 30, -30], rotate: [0, 5, 0] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0 }}
+          style={{
+            position: "absolute",
+            top: -100,
+            left: -100,
+            width: 500,
+            height: 500,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, #14B8A6, transparent 70%)",
+            opacity: 0.15,
+            pointerEvents: "none",
+          }}
+        />
+        {/* Orb 2 — coral bottom-right */}
+        <motion.div
+          animate={{ y: [-30, 30, -30], rotate: [0, -5, 0] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          style={{
+            position: "absolute",
+            bottom: -80,
+            right: -80,
+            width: 400,
+            height: 400,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, #F97316, transparent 70%)",
+            opacity: 0.1,
+            pointerEvents: "none",
+          }}
+        />
+        {/* Orb 3 — purple top-right */}
+        <motion.div
+          animate={{ y: [-20, 20, -20], rotate: [0, 8, 0] }}
+          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          style={{
+            position: "absolute",
+            top: "10%",
+            right: "5%",
+            width: 300,
+            height: 300,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, #8B5CF6, transparent 70%)",
+            opacity: 0.1,
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* Particles */}
+        {particles.map((p) => (
+          <div
+            key={p.id}
+            style={{
+              position: "absolute",
+              left: `${p.x}%`,
+              top: `${p.y}%`,
+              width: p.size,
+              height: p.size,
+              borderRadius: "50%",
+              background: "white",
+              opacity: 0.3,
+              pointerEvents: "none",
+            }}
+          />
+        ))}
+
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px", position: "relative", zIndex: 10 }}>
+
+          {/* Headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.7 }}
+            style={{
+              textAlign: "center",
+              fontWeight: 800,
+              color: "white",
+              lineHeight: 1.1,
+              fontSize: "clamp(36px, 5vw, 64px)",
+              maxWidth: 820,
+              margin: "0 auto",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+            Find Your Next Customer{" "}
+            <span style={{ color: "#14B8A6" }}>Before They Find You</span>
+          </motion.h1>
+
+          {/* Subheadline */}
+          <motion.p
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.6 }}
+            style={{
+              textAlign: "center",
+              fontSize: 20,
+              color: "#94A3B8",
+              maxWidth: 600,
+              margin: "24px auto 0",
+              lineHeight: 1.6,
+            }}
+          >
+            AVORA&apos;s AI identifies, qualifies, and connects you with decision-makers — automatically.
+          </motion.p>
+
+          {/* CTAs */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.5 }}
+            style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 16, marginTop: 40 }}
+          >
+            <Link
+              href="/register"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "#F97316",
+                color: "white",
+                fontWeight: 700,
+                fontSize: 16,
+                padding: "0 32px",
+                height: 56,
+                borderRadius: 12,
+                textDecoration: "none",
+                boxShadow: "0 8px 32px rgba(249,115,22,0.4)",
+                transition: "transform 0.2s, box-shadow 0.2s",
+              }}
+            >
+              Start for Free →
+            </Link>
+            <button
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "transparent",
+                color: "white",
+                fontWeight: 600,
+                fontSize: 16,
+                padding: "0 32px",
+                height: 56,
+                borderRadius: 12,
+                border: "2px solid rgba(255,255,255,0.35)",
+                cursor: "pointer",
+                transition: "background 0.2s",
+              }}
+            >
+              <span style={{ fontSize: 13 }}>▶</span> Watch Demo
+            </button>
+          </motion.div>
+
+          {/* Social Proof */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9, duration: 0.6 }}
+            style={{ marginTop: 40, textAlign: "center" }}
+          >
+            <p style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>
+              Trusted by 2,000+ sales teams worldwide
+            </p>
+            <div style={{ overflow: "hidden", maxWidth: 640, margin: "0 auto" }}>
+              <div className="marquee-track" style={{ display: "flex", gap: 16, width: "max-content" }}>
+                {[
+                  { name: "HubSpot", color: "#FF7A59" },
+                  { name: "Salesforce", color: "#00A1E0" },
+                  { name: "Stripe", color: "#635BFF" },
+                  { name: "Notion", color: "#94A3B8" },
+                  { name: "Slack", color: "#4A154B" },
+                  { name: "HubSpot", color: "#FF7A59" },
+                  { name: "Salesforce", color: "#00A1E0" },
+                  { name: "Stripe", color: "#635BFF" },
+                  { name: "Notion", color: "#94A3B8" },
+                  { name: "Slack", color: "#4A154B" },
+                ].map((logo, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      height: 34,
+                      padding: "0 18px",
+                      borderRadius: 8,
+                      background: logo.color + "18",
+                      border: `1px solid ${logo.color}33`,
+                      display: "flex",
+                      alignItems: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span style={{ color: logo.color, fontSize: 12, fontWeight: 700 }}>{logo.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Product Mockup */}
+          <motion.div
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9, duration: 0.8 }}
+            whileHover={{ y: -8, transition: { duration: 0.3 } }}
+            style={{ maxWidth: 800, margin: "64px auto 0", transform: "rotate(1.5deg)" }}
+          >
+            <div
+              style={{
+                background: "#0F1F3D",
+                borderRadius: 16,
+                overflow: "hidden",
+                boxShadow: "0 40px 120px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.07)",
+                position: "relative",
+              }}
+            >
+              {/* Window chrome */}
+              <div
+                style={{
+                  background: "#1A2E4A",
+                  padding: "12px 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#FF5F57" }} />
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#FFBD2E" }} />
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28C840" }} />
+                <div style={{ marginLeft: 16, flex: 1, height: 20, background: "rgba(255,255,255,0.06)", borderRadius: 4, maxWidth: 320 }} />
+              </div>
+
+              {/* App layout */}
+              <div style={{ display: "flex", minHeight: 370 }}>
+                {/* Sidebar */}
+                <div style={{ width: 180, background: "#0D1A30", padding: 16, borderRight: "1px solid rgba(255,255,255,0.05)", flexShrink: 0 }}>
+                  <div style={{ height: 28, background: "rgba(20,184,166,0.2)", borderRadius: 6, marginBottom: 10, border: "1px solid rgba(20,184,166,0.3)" }} />
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <div key={n} style={{ height: 24, background: "rgba(255,255,255,0.05)", borderRadius: 6, marginBottom: 6 }} />
+                  ))}
+                  <div style={{ marginTop: 20, height: 1, background: "rgba(255,255,255,0.05)" }} />
+                  {[1, 2].map((n) => (
+                    <div key={n} style={{ height: 24, background: "rgba(255,255,255,0.04)", borderRadius: 6, marginTop: 8 }} />
+                  ))}
+                </div>
+
+                {/* Main */}
+                <div style={{ flex: 1, padding: 20 }}>
+                  {/* Stats grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 18 }}>
+                    {[
+                      { color: "#14B8A6", label: "Leads Found", val: "1,284" },
+                      { color: "#F97316", label: "Open Rate", val: "38%" },
+                      { color: "#8B5CF6", label: "Meetings", val: "94" },
+                    ].map((s) => (
+                      <div
+                        key={s.label}
+                        style={{
+                          background: s.color + "18",
+                          borderRadius: 10,
+                          padding: "12px 14px",
+                          border: `1px solid ${s.color}30`,
+                        }}
+                      >
+                        <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.val}</div>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Lead rows */}
+                  {[
+                    { name: "Alex Morgan", title: "VP Sales · Acme Corp", color: "#14B8A6" },
+                    { name: "Priya Nair", title: "Growth Lead · ScaleIO", color: "#F97316" },
+                    { name: "James Liu", title: "CEO · Ventures Co", color: "#8B5CF6" },
+                    { name: "Fatima Al-Rashid", title: "Head of BD · MENA Tech", color: "#10B981" },
+                  ].map((lead) => (
+                    <div
+                      key={lead.name}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "9px 0",
+                        borderBottom: "1px solid rgba(255,255,255,0.05)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          background: lead.color,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "white",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {lead.name[0]}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "white" }}>{lead.name}</div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.38)" }}>{lead.title}</div>
+                      </div>
+                      <div
+                        style={{
+                          background: "#14B8A618",
+                          border: "1px solid #14B8A635",
+                          borderRadius: 20,
+                          padding: "2px 8px",
+                          fontSize: 10,
+                          color: "#14B8A6",
+                          fontWeight: 600,
+                          flexShrink: 0,
+                        }}
+                      >
+                        ICP ✓
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Floating accuracy badge */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 16,
+                  right: 16,
+                  background: "linear-gradient(135deg, #14B8A6, #0D9488)",
+                  borderRadius: 10,
+                  padding: "8px 14px",
+                  color: "white",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  boxShadow: "0 8px 24px rgba(20,184,166,0.45)",
+                }}
+              >
+                94% Accuracy ✓
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ── Social proof marquee ─────────────────────────────── */}
-      <section className="py-12 bg-white overflow-hidden border-b border-[#D5ECEC]">
-        <div className="max-w-7xl mx-auto px-4 mb-6 text-center">
-          <p className="text-sm text-[#8AACAC] font-medium uppercase tracking-widest">Trusted by growth teams across industries</p>
-        </div>
-        <div className="relative overflow-hidden">
-          <div className="marquee-track flex items-center gap-16">
-            {[...Array(2)].map((_, pass) =>
-              ["B2B SaaS", "FinTech", "EdTech", "HealthTech", "E-Commerce", "PropTech", "MarTech", "HR Tech", "LegalTech", "InsurTech"].map((name, i) => (
-                <span key={`${pass}-${i}`} className="text-[#9BCECE] font-semibold text-sm whitespace-nowrap px-4">
-                  {name}
-                </span>
-              ))
-            )}
+      {/* ══════════════════════════════════════════════════════════
+          3. STATS BAR
+      ══════════════════════════════════════════════════════════ */}
+      <section style={{ background: "#0D3D3D", padding: "4rem 0" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "2rem 1rem" }} className="md:grid-cols-4">
+            {[
+              { target: 2, suffix: "M+", label: "Verified Contacts" },
+              { target: 94, suffix: "%", label: "Email Accuracy" },
+              { target: 3, suffix: "x", label: "Pipeline Growth" },
+              { target: 150, suffix: "+", label: "Countries" },
+            ].map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                style={{ textAlign: "center" }}
+              >
+                <div
+                  style={{
+                    fontSize: 48,
+                    fontWeight: 800,
+                    color: "white",
+                    lineHeight: 1,
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                >
+                  <CountUp target={stat.target} suffix={stat.suffix} />
+                </div>
+                <div style={{ marginTop: 8, fontSize: 14, fontWeight: 500, color: "#5EEAD4" }}>
+                  {stat.label}
+                </div>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── Features ─────────────────────────────────────────── */}
-      <section id="features" className="py-28 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* ══════════════════════════════════════════════════════════
+          4. FEATURES SECTION
+      ══════════════════════════════════════════════════════════ */}
+      <section id="solutions" style={{ background: "white", padding: "6rem 0" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
           <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-80px" }}
-            variants={stagger}
-            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center", marginBottom: 60 }}
           >
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#FF5252] uppercase tracking-widest mb-4">
-              What You Get
-            </motion.span>
-            <motion.h2
-              variants={fadeUp}
-              custom={1}
-              className="text-4xl md:text-5xl font-bold text-[#1A2E2E] leading-tight mb-4"
-              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
-            >
-              Everything You Need to{" "}
-              <span className="text-gradient-teal">Win B2B Sales</span>
-            </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-[#4A6B6B] max-w-xl mx-auto text-lg">
-              Based on your real business data — not templates, not guesses.
-            </motion.p>
+            <h2 style={{ fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 800, color: "#0F172A", margin: 0 }}>
+              Everything You Need to Close More Deals
+            </h2>
+            <p style={{ fontSize: 18, color: "#64748B", maxWidth: 560, margin: "16px auto 0", lineHeight: 1.6 }}>
+              The complete GTM intelligence platform trusted by 2,000+ sales teams
+            </p>
           </motion.div>
 
           <motion.div
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-            variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            viewport={{ once: true }}
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(1, 1fr)",
+              gap: 24,
+            }}
+            className="sm:grid-cols-2 lg:grid-cols-3"
           >
-            {features.map((f, i) => (
+            {features.map((f) => (
               <motion.div
-                key={i}
-                variants={fadeUp}
-                custom={i}
-                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.12)" }}
-                className={`group rounded-2xl p-7 border ${f.border} ${f.cardBg} cursor-default transition-shadow duration-300`}
+                key={f.title}
+                variants={featureCardVariants}
+                whileHover={{ y: -6, boxShadow: "0 20px 60px rgba(0,0,0,0.12)" }}
+                transition={{ duration: 0.25 }}
+                style={{
+                  background: "white",
+                  borderRadius: 12,
+                  border: "1px solid #E2E8F0",
+                  padding: "32px",
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                }}
               >
-                <div className={`w-12 h-12 rounded-xl ${f.iconBg} flex items-center justify-center text-white mb-5 group-hover:scale-110 transition-transform duration-300`}>
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #14B8A6, #F97316)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 26,
+                    marginBottom: 20,
+                  }}
+                >
                   {f.icon}
                 </div>
-                <h3 className="font-bold text-[#1A2E2E] mb-3 text-lg">{f.title}</h3>
-                <p className="text-[#4A6B6B] text-sm leading-relaxed">{f.desc}</p>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0F172A", margin: "0 0 10px 0" }}>{f.title}</h3>
+                <p style={{ fontSize: 15, color: "#64748B", lineHeight: 1.65, margin: "0 0 16px 0" }}>{f.desc}</p>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#14B8A6" }}>Learn more →</span>
               </motion.div>
             ))}
           </motion.div>
         </div>
       </section>
 
-      {/* ── Stats dark section ───────────────────────────────── */}
-      <section className="py-24 gradient-dark-section relative overflow-hidden">
-        <div className="absolute top-0 left-1/4 w-64 h-64 bg-[#2D8080]/15 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-[#FF5252]/08 rounded-full blur-3xl" />
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* ══════════════════════════════════════════════════════════
+          5. HOW IT WORKS
+      ══════════════════════════════════════════════════════════ */}
+      <section style={{ background: "#F8FAFC", padding: "6rem 0" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
           <motion.div
-            initial="hidden"
-            whileInView="visible"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            variants={stagger}
-            className="text-center mb-16"
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center", marginBottom: 80 }}
           >
-            <motion.h2
-              variants={fadeUp}
-              className="text-4xl md:text-5xl font-bold text-white mb-4"
-              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
-            >
-              Results That Speak for Themselves
-            </motion.h2>
-            <motion.p variants={fadeUp} custom={1} className="text-white/50 text-lg">
-              Powered by real data from real businesses
-            </motion.p>
+            <h2 style={{ fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 800, color: "#0F172A", margin: 0 }}>
+              From Sign Up to First Deal in 24 Hours
+            </h2>
           </motion.div>
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={stagger}
-            className="grid grid-cols-2 md:grid-cols-4 gap-8"
-          >
-            {[
-              { value: 500, suffix: "+", label: "Companies Onboarded", color: "text-[#4DB8B8]" },
-              { value: 95, suffix: "%", label: "Strategy Accuracy", color: "text-[#FF8080]" },
-              { value: 3, suffix: "x", label: "Avg Outreach Response Rate", color: "text-[#80D4D4]" },
-              { value: 7, suffix: " days", label: "Lead Delivery SLA", color: "text-white/90" },
-            ].map((stat, i) => (
-              <motion.div key={i} variants={fadeUp} custom={i} className="text-center">
-                <div className={`text-5xl font-extrabold mb-2 ${stat.color}`} style={{ fontFamily: "'Nunito', sans-serif" }}>
-                  <AnimatedNumber target={stat.value} suffix={stat.suffix} />
+
+          {/* Step 1 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 48, alignItems: "center", marginBottom: 96 }} className="lg:grid-cols-2">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <div style={{ display: "inline-block", background: "linear-gradient(135deg, #14B8A6, #0D9488)", borderRadius: 8, padding: "4px 14px", fontSize: 12, fontWeight: 700, color: "white", marginBottom: 18, letterSpacing: "0.04em" }}>
+                Step 01
+              </div>
+              <h3 style={{ fontSize: 28, fontWeight: 800, color: "#0F172A", margin: "0 0 14px 0" }}>Connect Your Website</h3>
+              <p style={{ fontSize: 17, color: "#64748B", lineHeight: 1.7, margin: 0 }}>
+                Sign up in 30 seconds. ARIA instantly analyzes your website to understand your business and ICP.
+              </p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <div style={{ background: "#0F1F3D", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+                <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+                  <div style={{ flex: 1, height: 42, background: "rgba(255,255,255,0.07)", borderRadius: 8, display: "flex", alignItems: "center", paddingLeft: 14 }}>
+                    <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 13 }}>https://yourcompany.com</span>
+                  </div>
+                  <div style={{ background: "#14B8A6", borderRadius: 8, minWidth: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 600 }}>
+                    Analyze
+                  </div>
                 </div>
-                <div className="text-white/50 text-sm font-medium">{stat.label}</div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
+                {["Detecting industry: SaaS / B2B", "ICP: Mid-market Tech Companies", "Region: North America, Europe"].map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#14B8A6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white", fontWeight: 700, flexShrink: 0 }}>
+                      ✓
+                    </div>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
 
-      {/* ── How It Works ─────────────────────────────────────── */}
-      <section id="how-it-works" className="py-28 gradient-teal-subtle">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-80px" }}
-            variants={stagger}
-            className="text-center mb-16"
-          >
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#FF5252] uppercase tracking-widest mb-4">
-              How It Works
-            </motion.span>
-            <motion.h2
-              variants={fadeUp}
-              custom={1}
-              className="text-4xl md:text-5xl font-bold text-[#1A2E2E] mb-4"
-              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
+          {/* Step 2 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 48, alignItems: "center", marginBottom: 96 }} className="lg:grid-cols-2">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              style={{ order: 2 }}
+              className="lg:order-1"
             >
-              From Zero to Full GTM Strategy
-            </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-[#4A6B6B] max-w-xl mx-auto text-lg">
-              A structured, AI-guided onboarding that turns your business knowledge into strategy.
-            </motion.p>
-          </motion.div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  { name: "Marcus Webb", title: "VP Sales", company: "Acme Corp", color: "#14B8A6" },
+                  { name: "Aisha Patel", title: "Head of Growth", company: "ScaleIO", color: "#F97316" },
+                  { name: "Ryan Torres", title: "CEO", company: "Ventures Co", color: "#8B5CF6" },
+                ].map((lead, i) => (
+                  <motion.div
+                    key={lead.name}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    style={{ background: "white", borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.07)", border: "1px solid #E2E8F0" }}
+                  >
+                    <div style={{ width: 42, height: 42, borderRadius: "50%", background: lead.color, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 17, flexShrink: 0 }}>
+                      {lead.name[0]}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{lead.name}</div>
+                      <div style={{ fontSize: 12, color: "#64748B" }}>{lead.title} · {lead.company}</div>
+                    </div>
+                    <div style={{ background: "#14B8A610", border: "1px solid #14B8A628", borderRadius: 20, padding: "3px 10px", fontSize: 11, color: "#14B8A6", fontWeight: 600 }}>
+                      ICP ✓
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              style={{ order: 1 }}
+              className="lg:order-2"
+            >
+              <div style={{ display: "inline-block", background: "linear-gradient(135deg, #F97316, #EA6A00)", borderRadius: 8, padding: "4px 14px", fontSize: 12, fontWeight: 700, color: "white", marginBottom: 18, letterSpacing: "0.04em" }}>
+                Step 02
+              </div>
+              <h3 style={{ fontSize: 28, fontWeight: 800, color: "#0F172A", margin: "0 0 14px 0" }}>Get 5 Free Qualified Leads</h3>
+              <p style={{ fontSize: 17, color: "#64748B", lineHeight: 1.7, margin: 0 }}>
+                Instantly receive 5 verified decision-makers matched to your ideal customer profile.
+              </p>
+            </motion.div>
+          </div>
 
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-            variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-          >
-            {steps.map((s, i) => (
-              <motion.div
-                key={i}
-                variants={fadeUp}
-                custom={i}
-                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.10)" }}
-                className="relative bg-white rounded-2xl p-7 border border-[#D5ECEC] shadow-sm transition-all duration-300"
-              >
-                {i < steps.length - 1 && (
-                  <div className="hidden lg:block absolute top-10 -right-3 w-6 h-0.5 bg-gradient-to-r from-[#9BCECE] to-transparent z-10" />
-                )}
-                <div className="w-10 h-10 bg-[#1A6B6B] text-white rounded-xl flex items-center justify-center mb-5">
-                  {s.icon}
+          {/* Step 3 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 48, alignItems: "center", marginBottom: 96 }} className="lg:grid-cols-2">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <div style={{ display: "inline-block", background: "linear-gradient(135deg, #8B5CF6, #7C3AED)", borderRadius: 8, padding: "4px 14px", fontSize: 12, fontWeight: 700, color: "white", marginBottom: 18, letterSpacing: "0.04em" }}>
+                Step 03
+              </div>
+              <h3 style={{ fontSize: 28, fontWeight: 800, color: "#0F172A", margin: "0 0 14px 0" }}>Complete Tasks, Unlock More</h3>
+              <p style={{ fontSize: 17, color: "#64748B", lineHeight: 1.7, margin: 0 }}>
+                ARIA guides you through setup tasks. Each completed task unlocks more leads and features.
+              </p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <div style={{ background: "white", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.08)", border: "1px solid #E2E8F0" }}>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>Setup Progress</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#14B8A6" }}>50%</span>
+                  </div>
+                  <div style={{ height: 8, background: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: "50%" }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1, delay: 0.3 }}
+                      style={{ height: "100%", background: "linear-gradient(90deg, #14B8A6, #F97316)", borderRadius: 4 }}
+                    />
+                  </div>
                 </div>
-                <div className="text-xs font-bold text-[#FF5252] mb-2">{s.n}</div>
-                <h3 className="font-bold text-[#1A2E2E] mb-2 text-lg">{s.title}</h3>
-                <p className="text-[#4A6B6B] text-sm leading-relaxed">{s.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
+                {[
+                  { task: "Connect your website", done: true },
+                  { task: "Define your ICP", done: true },
+                  { task: "Set up CRM integration", done: false },
+                  { task: "Launch first campaign", done: false },
+                ].map((t) => (
+                  <div key={t.task} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
+                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: t.done ? "#14B8A6" : "transparent", border: t.done ? "none" : "2px solid #CBD5E1", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "white", fontWeight: 700, flexShrink: 0 }}>
+                      {t.done ? "✓" : ""}
+                    </div>
+                    <span style={{ fontSize: 14, color: t.done ? "#0F172A" : "#94A3B8", fontWeight: t.done ? 500 : 400 }}>{t.task}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Step 4 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 48, alignItems: "center" }} className="lg:grid-cols-2">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              style={{ order: 2 }}
+              className="lg:order-1"
+            >
+              <div style={{ background: "#0F1F3D", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+                {[
+                  { label: "ICP Analysis", color: "#14B8A6", width: "90%" },
+                  { label: "ABM Strategy", color: "#F97316", width: "75%" },
+                  { label: "Outreach Playbook", color: "#8B5CF6", width: "85%" },
+                  { label: "Revenue Forecast", color: "#10B981", width: "60%" },
+                ].map((item, i) => (
+                  <div key={item.label} style={{ marginBottom: 20 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{item.label}</span>
+                      <span style={{ fontSize: 12, color: item.color, fontWeight: 700 }}>Complete</span>
+                    </div>
+                    <div style={{ height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 3 }}>
+                      <motion.div
+                        initial={{ width: 0 }}
+                        whileInView={{ width: item.width }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.8, delay: i * 0.15 }}
+                        style={{ height: "100%", background: item.color, borderRadius: 3 }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              style={{ order: 1 }}
+              className="lg:order-2"
+            >
+              <div style={{ display: "inline-block", background: "linear-gradient(135deg, #10B981, #059669)", borderRadius: 8, padding: "4px 14px", fontSize: 12, fontWeight: 700, color: "white", marginBottom: 18, letterSpacing: "0.04em" }}>
+                Step 04
+              </div>
+              <h3 style={{ fontSize: 28, fontWeight: 800, color: "#0F172A", margin: "0 0 14px 0" }}>Full GTM Strategy Generated</h3>
+              <p style={{ fontSize: 17, color: "#64748B", lineHeight: 1.7, margin: 0 }}>
+                Get your complete ICP, ABM strategy, and outreach playbooks — ready to execute in 24 hours.
+              </p>
+            </motion.div>
+          </div>
         </div>
       </section>
 
-      {/* ── Testimonials ─────────────────────────────────────── */}
-      <section className="py-28 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* ══════════════════════════════════════════════════════════
+          6. SOCIAL PROOF
+      ══════════════════════════════════════════════════════════ */}
+      <section id="customers" style={{ background: "#0A1628", padding: "6rem 0" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
           <motion.div
-            initial="hidden"
-            whileInView="visible"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            variants={stagger}
-            className="text-center mb-16"
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center", marginBottom: 64 }}
           >
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#FF5252] uppercase tracking-widest mb-4">
-              Testimonials
-            </motion.span>
-            <motion.h2
-              variants={fadeUp}
-              custom={1}
-              className="text-4xl md:text-5xl font-bold text-[#1A2E2E] mb-4"
-              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
-            >
-              Loved by B2B Teams
-            </motion.h2>
+            <h2 style={{ fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 800, color: "white", margin: 0 }}>
+              Loved by Sales Teams Worldwide
+            </h2>
           </motion.div>
+
           <motion.div
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.15 } } }}
+            style={{ display: "grid", gridTemplateColumns: "repeat(1, 1fr)", gap: 24 }}
+            className="md:grid-cols-3"
           >
-            {testimonials.map((t, i) => (
+            {testimonials.map((t) => (
               <motion.div
-                key={i}
-                variants={fadeUp}
-                custom={i}
-                whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.10)" }}
-                className="bg-white rounded-2xl p-7 border border-[#D5ECEC] shadow-sm transition-all duration-300"
+                key={t.name}
+                variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0 } }}
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 16,
+                  padding: "32px",
+                }}
               >
-                <div className="flex mb-4">
-                  {Array.from({ length: 5 }).map((_, s) => (
-                    <svg key={s} className="w-4 h-4 text-[#FBBF24]" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
+                <div style={{ display: "flex", gap: 3, marginBottom: 20 }}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <span key={s} style={{ color: "#F97316", fontSize: 18 }}>★</span>
                   ))}
                 </div>
-                <p className="text-[#4A6B6B] text-sm leading-relaxed mb-6 italic">&ldquo;{t.quote}&rdquo;</p>
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-                    {t.initials}
+                <p style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", lineHeight: 1.75, margin: "0 0 24px 0" }}>
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: "50%", background: t.color, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 19, flexShrink: 0 }}>
+                    {t.initial}
                   </div>
                   <div>
-                    <div className="font-semibold text-[#1A2E2E] text-sm">{t.name}</div>
-                    <div className="text-[#8AACAC] text-xs">{t.role} · {t.company}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "white" }}>{t.name}</div>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>{t.role} at {t.company}</div>
                   </div>
                 </div>
               </motion.div>
@@ -651,213 +1184,370 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Pricing ──────────────────────────────────────────── */}
-      <section id="pricing" className="py-28 gradient-teal-subtle">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* ══════════════════════════════════════════════════════════
+          7. INTEGRATIONS
+      ══════════════════════════════════════════════════════════ */}
+      <section style={{ background: "white", padding: "6rem 0" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
           <motion.div
-            initial="hidden"
-            whileInView="visible"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            variants={stagger}
-            className="text-center mb-16"
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center", marginBottom: 60 }}
           >
-            <motion.span variants={fadeUp} className="inline-block text-xs font-bold text-[#FF5252] uppercase tracking-widest mb-4">
-              Pricing
-            </motion.span>
-            <motion.h2
-              variants={fadeUp}
-              custom={1}
-              className="text-4xl md:text-5xl font-bold text-[#1A2E2E] mb-4"
-              style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
-            >
-              Simple, Transparent Pricing
-            </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-[#4A6B6B] text-lg">
-              Start free. Upgrade when you need leads.
-            </motion.p>
+            <h2 style={{ fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 800, color: "#0F172A", margin: 0 }}>
+              Works With Your Existing Stack
+            </h2>
+            <p style={{ fontSize: 18, color: "#64748B", marginTop: 14 }}>
+              Connect AVORA with the tools you already use
+            </p>
           </motion.div>
 
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }} className="sm:grid-cols-3 md:grid-cols-5">
+            {integrations.map((integ, i) => (
+              <motion.div
+                key={integ.name}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05, type: "spring", stiffness: 300 }}
+                whileHover={{ scale: 1.1, y: -4 }}
+                style={{
+                  background: "white",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: 14,
+                  padding: "22px 16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 10,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 12,
+                    background: integ.color,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontWeight: 800,
+                    fontSize: 14,
+                  }}
+                >
+                  {integ.letter}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>{integ.name}</span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════
+          8. PRICING
+      ══════════════════════════════════════════════════════════ */}
+      <section id="pricing" style={{ background: "#F8FAFC", padding: "6rem 0" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
           <motion.div
-            initial="hidden"
-            whileInView="visible"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center", marginBottom: 52 }}
           >
-            {/* LITE */}
-            <motion.div
-              variants={fadeUp}
-              custom={0}
-              whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.10)" }}
-              className="bg-white rounded-2xl p-8 border border-[#D5ECEC] shadow-sm transition-all duration-300"
-            >
-              <div className="text-xs font-bold text-[#8AACAC] uppercase tracking-widest mb-3">LITE</div>
-              <div className="text-5xl font-extrabold text-[#1A2E2E] mb-1" style={{ fontFamily: "'Nunito', sans-serif" }}>Free</div>
-              <p className="text-[#8AACAC] text-sm mb-8">Forever</p>
-              <ul className="space-y-3 mb-8">
-                {["Full GTM strategy generation", "ICP, DMU, ABM, Outreach", "Up to 3 PDF exports", "Lead requests at $15/lead"].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-[#4A6B6B]">
-                    <span className="w-5 h-5 rounded-full bg-[#EFF6F6] text-[#1A6B6B] flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✓</span>
-                    {item}
-                  </li>
-                ))}
-                {["Leads Dashboard", "XLSX export"].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-[#8AACAC]">
-                    <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">✗</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link
-                  href="/register"
-                  className="block text-center border-2 border-[#1A6B6B] text-[#1A6B6B] hover:bg-[#1A6B6B] hover:text-white font-bold px-6 py-3 rounded-xl transition-all duration-200"
-                >
-                  Start Free
-                </Link>
-              </motion.div>
-            </motion.div>
+            <h2 style={{ fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 800, color: "#0F172A", margin: 0 }}>
+              Simple, Transparent Pricing
+            </h2>
+            <p style={{ fontSize: 18, color: "#64748B", marginTop: 14 }}>Start free, scale as you grow</p>
 
-            {/* PLUS — highlighted */}
-            <motion.div
-              variants={fadeUp}
-              custom={1}
-              whileHover={{ y: -4 }}
-              className="relative gradient-hero rounded-2xl p-8 text-white shadow-2xl shadow-[#1A5C5C]/30 md:-mt-4 md:mb-4 transition-all duration-300"
+            {/* Billing toggle */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0,
+                marginTop: 28,
+                background: "white",
+                borderRadius: 40,
+                padding: 4,
+                border: "1px solid #E2E8F0",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              }}
             >
-              <div className="absolute top-5 right-5 bg-[#FF5252] text-white text-xs font-bold px-3 py-1 rounded-full">
-                MOST POPULAR
-              </div>
-              <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-x-10 -translate-y-10 blur-2xl" />
-              <div className="text-xs font-bold text-white/50 uppercase tracking-widest mb-3">PLUS</div>
-              <div className="text-5xl font-extrabold mb-1" style={{ fontFamily: "'Nunito', sans-serif" }}>$5<span className="text-2xl font-normal text-white/50">/lead</span></div>
-              <p className="text-white/40 text-sm mb-8">After confirmed payment</p>
-              <ul className="space-y-3 mb-8">
-                {[
-                  "Everything in LITE",
-                  "$5/lead (was $15)",
-                  "Full Leads Dashboard",
-                  "7 business day delivery",
-                  "CRM-ready data + personality",
-                  "XLSX export ($100/pack)",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-white/85">
-                    <span className="w-5 h-5 rounded-full bg-white/15 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✓</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link
-                  href="/register"
-                  className="block text-center bg-[#FF5252] hover:bg-[#E04545] text-white font-bold px-6 py-3 rounded-xl transition-colors btn-glow-coral shadow-lg"
-                >
-                  Get Started
-                </Link>
-              </motion.div>
-            </motion.div>
+              <button
+                onClick={() => setAnnual(false)}
+                style={{
+                  padding: "9px 22px",
+                  borderRadius: 36,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  background: !annual ? "#14B8A6" : "transparent",
+                  color: !annual ? "white" : "#64748B",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setAnnual(true)}
+                style={{
+                  padding: "9px 22px",
+                  borderRadius: 36,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  background: annual ? "#14B8A6" : "transparent",
+                  color: annual ? "white" : "#64748B",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                Annual
+                <span style={{ background: "#F97316", color: "white", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
+                  -20%
+                </span>
+              </button>
+            </div>
+          </motion.div>
 
-            {/* Enterprise */}
-            <motion.div
-              variants={fadeUp}
-              custom={2}
-              whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(26,107,107,0.10)" }}
-              className="bg-white rounded-2xl p-8 border border-[#D5ECEC] shadow-sm transition-all duration-300"
-            >
-              <div className="text-xs font-bold text-[#8AACAC] uppercase tracking-widest mb-3">ENTERPRISE</div>
-              <div className="text-5xl font-extrabold text-[#1A2E2E] mb-1" style={{ fontFamily: "'Nunito', sans-serif" }}>Custom</div>
-              <p className="text-[#8AACAC] text-sm mb-8">Contact us for pricing</p>
-              <ul className="space-y-3 mb-8">
-                {["Everything in PLUS", "Dedicated account manager", "Custom lead volumes", "White-label reports", "Team collaboration", "API access"].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-[#4A6B6B]">
-                    <span className="w-5 h-5 rounded-full bg-[#FFF0F0] text-[#FF5252] flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✓</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(1, 1fr)", gap: 24, alignItems: "start" }} className="md:grid-cols-3">
+            {pricingPlans.map((plan, i) => (
+              <motion.div
+                key={plan.name}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                style={{
+                  background: "white",
+                  borderRadius: 18,
+                  padding: "36px 32px",
+                  border: plan.highlight ? "2px solid #14B8A6" : "1px solid #E2E8F0",
+                  transform: plan.highlight ? "scale(1.02)" : "none",
+                  boxShadow: plan.highlight
+                    ? "0 20px 60px rgba(20,184,166,0.15)"
+                    : "0 4px 20px rgba(0,0,0,0.05)",
+                  position: "relative",
+                }}
+              >
+                {plan.badge && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: -14,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      background: "#14B8A6",
+                      color: "white",
+                      borderRadius: 20,
+                      padding: "5px 18px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {plan.badge}
+                  </div>
+                )}
+
+                <h3 style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", margin: "0 0 4px 0" }}>{plan.name}</h3>
+                <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 22px 0" }}>{plan.for}</p>
+
+                <div style={{ marginBottom: 28 }}>
+                  {plan.price === null ? (
+                    <span style={{ fontSize: 38, fontWeight: 800, color: "#0F172A" }}>Custom</span>
+                  ) : plan.price === 0 ? (
+                    <span style={{ fontSize: 38, fontWeight: 800, color: "#0F172A" }}>Free</span>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                      <span style={{ fontSize: 38, fontWeight: 800, color: "#0F172A" }}>
+                        ${annual ? Math.round((plan.price as number) * 0.8) : plan.price}
+                      </span>
+                      <span style={{ fontSize: 14, color: "#64748B" }}>/month</span>
+                    </div>
+                  )}
+                </div>
+
+                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px 0" }}>
+                  {plan.features.map((f) => (
+                    <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+                      <span style={{ color: "#14B8A6", fontSize: 14, fontWeight: 700, flexShrink: 0, lineHeight: "22px" }}>✓</span>
+                      <span style={{ fontSize: 14, color: "#475569", lineHeight: 1.5 }}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
                 <Link
-                  href="/contact"
-                  className="block text-center border-2 border-[#1A6B6B] text-[#1A6B6B] hover:bg-[#1A6B6B] hover:text-white font-bold px-6 py-3 rounded-xl transition-all duration-200"
+                  href={plan.href}
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    padding: "14px",
+                    borderRadius: 12,
+                    fontWeight: 600,
+                    fontSize: 15,
+                    textDecoration: "none",
+                    transition: "all 0.2s",
+                    ...(plan.ctaVariant === "outline-teal"
+                      ? { border: "2px solid #14B8A6", color: "#14B8A6", background: "transparent" }
+                      : plan.ctaVariant === "coral"
+                      ? { background: "#F97316", color: "white", border: "none" }
+                      : { background: "#0A1628", color: "white", border: "none" }),
+                  }}
                 >
-                  Contact Sales
+                  {plan.cta}
                 </Link>
               </motion.div>
-            </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════
+          9. FINAL CTA
+      ══════════════════════════════════════════════════════════ */}
+      <section
+        style={{
+          background: "linear-gradient(135deg, #0D9488 0%, #14B8A6 50%, #0D3D3D 100%)",
+          backgroundSize: "200% 200%",
+          animation: "gradientShift 8s ease infinite",
+          padding: "6rem 0",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: "-50%",
+            left: "-10%",
+            width: 500,
+            height: 500,
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.05)",
+            pointerEvents: "none",
+          }}
+        />
+        <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 24px", textAlign: "center", position: "relative", zIndex: 10 }}>
+          <motion.h2
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, color: "white", margin: 0 }}
+          >
+            Ready to Fill Your Pipeline?
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+            style={{ fontSize: 18, color: "rgba(255,255,255,0.85)", marginTop: 18, marginBottom: 44, lineHeight: 1.6 }}
+          >
+            Join 2,000+ sales teams using AVORA to find and close more deals.
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.35, duration: 0.6 }}
+            style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center" }}
+          >
+            <Link
+              href="/register"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "white",
+                color: "#0D9488",
+                fontWeight: 700,
+                fontSize: 15,
+                padding: "16px 28px",
+                borderRadius: 14,
+                textDecoration: "none",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                transition: "transform 0.2s",
+              }}
+            >
+              Start for Free — No Credit Card Required
+            </Link>
+            <Link
+              href="/contact"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "transparent",
+                color: "white",
+                fontWeight: 600,
+                fontSize: 15,
+                padding: "16px 28px",
+                borderRadius: 14,
+                textDecoration: "none",
+                border: "2px solid rgba(255,255,255,0.45)",
+                transition: "background 0.2s",
+              }}
+            >
+              Talk to Sales
+            </Link>
           </motion.div>
         </div>
       </section>
 
-      {/* ── Final CTA ─────────────────────────────────────────── */}
-      <section className="py-28 gradient-hero relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#2D8080]/15 rounded-full blur-3xl float-orb" />
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={stagger}
-          className="relative max-w-4xl mx-auto px-4 text-center"
-        >
-          <motion.h2
-            variants={fadeUp}
-            className="text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight"
-            style={{ letterSpacing: "-0.02em", fontFamily: "'Nunito', sans-serif" }}
+      {/* ══════════════════════════════════════════════════════════
+          10. FOOTER
+      ══════════════════════════════════════════════════════════ */}
+      <footer style={{ background: "#0A1628", padding: "5rem 0 2rem" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
+          {/* Grid: brand + 4 columns */}
+          <div
+            style={{ display: "grid", gridTemplateColumns: "repeat(1, 1fr)", gap: "3rem 2rem", paddingBottom: 48, borderBottom: "1px solid rgba(255,255,255,0.07)" }}
+            className="md:grid-cols-5"
           >
-            Ready to Build Your{" "}
-            <span className="hero-gradient-text">GTM Strategy?</span>
-          </motion.h2>
-          <motion.p variants={fadeUp} custom={1} className="text-white/55 text-xl max-w-2xl mx-auto mb-10">
-            Join hundreds of businesses using AVORA to target the right accounts and close more deals.
-          </motion.p>
-          <motion.div variants={fadeUp} custom={2} className="flex flex-col sm:flex-row gap-4 justify-center">
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Link
-                href="/register"
-                className="inline-flex items-center gap-2 bg-[#FF5252] hover:bg-[#E04545] text-white font-bold px-10 py-4 rounded-2xl text-lg transition-colors btn-glow-coral shadow-xl"
-              >
-                Start Building for Free
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </Link>
-            </motion.div>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Link
-                href="/contact"
-                className="inline-flex items-center gap-2 glass-navy text-white/85 hover:text-white font-bold px-8 py-4 rounded-2xl text-lg transition-all border border-white/15"
-              >
-                Talk to Sales
-              </Link>
-            </motion.div>
-          </motion.div>
-        </motion.div>
-      </section>
-
-      {/* ── Footer ────────────────────────────────────────────── */}
-      <footer className="bg-[#1A5C5C] pt-16 pb-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
-            {/* Brand */}
-            <div className="md:col-span-1">
-              <AvoraLogo size={32} showTagline variant="light" taglineColor="rgba(255,255,255,0.35)" />
-              <p className="mt-4 text-sm text-white/35 leading-relaxed">
-                AI-powered GTM strategy platform for B2B sales teams.
+            {/* Brand column */}
+            <div>
+              <AvoraLogo variant="light" height={38} />
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.38)", marginTop: 14, lineHeight: 1.7, maxWidth: 200 }}>
+                AI-Powered GTM &amp; Sales Intelligence
               </p>
-              <p className="mt-3 text-xs text-white/25">Payments via Payoneer</p>
             </div>
-            {/* Links */}
-            {[
-              { heading: "Product", links: [{ label: "Features", href: "#features" }, { label: "How It Works", href: "#how-it-works" }, { label: "Pricing", href: "#pricing" }] },
-              { heading: "Company", links: [{ label: "Contact Us", href: "/contact" }, { label: "Sign In", href: "/login" }, { label: "Get Started", href: "/register" }] },
-              { heading: "Legal", links: [{ label: "Terms of Service", href: "#" }, { label: "Privacy Policy", href: "#" }] },
-            ].map((col) => (
-              <div key={col.heading}>
-                <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4">{col.heading}</h4>
-                <ul className="space-y-3">
+
+            {/* Link columns */}
+            {footerColumns.map((col) => (
+              <div key={col.title}>
+                <h4
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "rgba(255,255,255,0.85)",
+                    marginBottom: 20,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    margin: "0 0 18px 0",
+                  }}
+                >
+                  {col.title}
+                </h4>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                   {col.links.map((link) => (
-                    <li key={link.label}>
-                      <Link href={link.href} className="text-sm text-white/50 hover:text-white/90 transition-colors">
-                        {link.label}
+                    <li key={link} style={{ marginBottom: 10 }}>
+                      <Link
+                        href="#"
+                        style={{ fontSize: 14, color: "rgba(255,255,255,0.42)", textDecoration: "none", transition: "color 0.2s" }}
+                        className="hover:text-[#14B8A6]"
+                      >
+                        {link}
                       </Link>
                     </li>
                   ))}
@@ -865,14 +1555,33 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          <div className="border-t border-white/8 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-white/25">© 2025 AVORA by Enigma Sales. All rights reserved.</p>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF5252] opacity-60" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF5252] opacity-30" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF5252] opacity-15" />
+
+          {/* Bottom bar */}
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16, paddingTop: 32 }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.32)", margin: 0 }}>
+              © 2026 AVORA by Enigma Sales. All rights reserved.
+            </p>
+            <div style={{ display: "flex", gap: 20 }}>
+              {/* LinkedIn */}
+              <a href="#" aria-label="LinkedIn" style={{ color: "rgba(255,255,255,0.38)", transition: "color 0.2s" }} className="hover:text-[#14B8A6]">
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z" />
+                  <circle cx="4" cy="4" r="2" />
+                </svg>
+              </a>
+              {/* X / Twitter */}
+              <a href="#" aria-label="Twitter" style={{ color: "rgba(255,255,255,0.38)", transition: "color 0.2s" }} className="hover:text-[#14B8A6]">
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+              </a>
+              {/* YouTube */}
+              <a href="#" aria-label="YouTube" style={{ color: "rgba(255,255,255,0.38)", transition: "color 0.2s" }} className="hover:text-[#14B8A6]">
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58zM9.75 15.02V8.98L15.5 12l-5.75 3.02z" />
+                </svg>
+              </a>
             </div>
-            <p className="text-xs text-white/20">English & Arabic · AI-Powered GTM Platform</p>
           </div>
         </div>
       </footer>
