@@ -4,9 +4,25 @@ import { hashPassword, createToken } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit";
 import { cookies } from "next/headers";
 
+const FREE_EMAIL_DOMAINS = new Set([
+  "gmail.com","yahoo.com","hotmail.com","outlook.com","icloud.com",
+  "live.com","msn.com","aol.com","mail.com","protonmail.com",
+  "ymail.com","yahoo.co.uk","googlemail.com","me.com",
+]);
+
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password } = await req.json();
+    const body = await req.json();
+    const {
+      name,
+      firstName,
+      lastName,
+      companyName,
+      companyWebsite,
+      phone,
+      email,
+      password,
+    } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -22,6 +38,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Block free email providers
+    const emailDomain = email.split("@")[1]?.toLowerCase();
+    if (FREE_EMAIL_DOMAINS.has(emailDomain)) {
+      return NextResponse.json(
+        { error: "Please use your business email address, not a personal one." },
+        { status: 400 }
+      );
+    }
+
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return NextResponse.json(
@@ -33,9 +58,19 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await hashPassword(password);
     const isAdmin = email === process.env.ADMIN_EMAIL;
 
+    // Derive display name from firstName/lastName or fallback to name field
+    const displayName = firstName && lastName
+      ? `${firstName} ${lastName}`.trim()
+      : name || firstName || lastName || undefined;
+
     const user = await prisma.user.create({
       data: {
-        name,
+        name: displayName,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        companyName: companyName || null,
+        companyWebsite: companyWebsite || null,
+        phone: phone || null,
         email,
         password: hashedPassword,
         isAdmin,
@@ -43,9 +78,13 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Create empty company profile
+    // Create company profile prefilled with sign-up data
     await prisma.companyProfile.create({
-      data: { userId: user.id },
+      data: {
+        userId: user.id,
+        companyName: companyName || null,
+        websiteUrl: companyWebsite || null,
+      },
     });
 
     const token = createToken({ sessionType: "user", userId: user.id });
@@ -59,15 +98,14 @@ export async function POST(req: NextRequest) {
       path: "/",
     });
 
-    await createAuditLog(user.id, "USER_REGISTERED", "User", user.id, {
-      email,
-    });
+    await createAuditLog(user.id, "USER_REGISTERED", "User", user.id, { email });
 
     return NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        firstName: user.firstName,
         plan: user.plan,
         isAdmin: user.isAdmin,
       },

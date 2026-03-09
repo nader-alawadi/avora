@@ -2,25 +2,39 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AVORA — AI-Powered GTM & Sales Strategy Platform",
+  title: "AVORA — AI-Powered GTM & Sales Intelligence Platform",
   description:
-    "Generate your complete Go-To-Market strategy in minutes with AI. ICP, DMU Map, ABM Strategy, Outreach Playbook, and targeted leads — all powered by Claude AI.",
-  keywords: "GTM strategy, go-to-market, ICP, ideal customer profile, ABM, account-based marketing, outreach, B2B sales, AI strategy",
+    "Find, qualify and connect with your ideal customers using AI. Get verified leads, GTM strategy, and outreach playbooks — all in one platform.",
+  keywords:
+    "GTM strategy, go-to-market, sales intelligence, ICP builder, lead discovery, ABM, account-based marketing, outreach playbook, B2B sales, AI sales platform, ARIA AI",
   authors: [{ name: "Enigma Sales" }],
   creator: "Enigma Sales",
   publisher: "AVORA by Enigma Sales",
+  metadataBase: new URL("https://avora.ai"),
   openGraph: {
-    title: "AVORA — AI-Powered GTM & Sales Strategy Platform",
-    description: "Generate your complete Go-To-Market strategy in minutes with AI. ICP, DMU Map, ABM Strategy, Outreach Playbook, and targeted leads.",
+    title: "AVORA — AI-Powered GTM & Sales Intelligence Platform",
+    description:
+      "Find, qualify and connect with your ideal customers using AI. Get verified leads, GTM strategy, and outreach playbooks — all in one platform.",
     url: "https://avora.ai",
     siteName: "AVORA",
     locale: "en_US",
     type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "AVORA — AI-Powered GTM & Sales Intelligence Platform",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AVORA — AI-Powered GTM Strategy",
-    description: "Generate your complete Go-To-Market strategy in minutes with AI.",
+    title: "AVORA — AI-Powered GTM & Sales Intelligence",
+    description:
+      "Find, qualify and connect with your ideal customers using AI. Verified leads, GTM strategy, and outreach playbooks.",
+    images: ["/og-image.png"],
+    creator: "@avoraai",
   },
   robots: {
     index: true,
@@ -33,16 +47,23 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  alternates: {
+    canonical: "https://avora.ai",
+  },
 };
 
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "AVORA by Enigma Sales",
-  description: "AI-powered Go-To-Market strategy platform for B2B sales teams",
+  description:
+    "AI-powered GTM & Sales Intelligence platform — find, qualify and connect with your ideal customers",
   url: "https://avora.ai",
   logo: "https://avora.ai/avora-logo.svg",
-  sameAs: [],
+  sameAs: [
+    "https://linkedin.com/company/avora-ai",
+    "https://twitter.com/avoraai",
+  ],
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "sales",
@@ -59,7 +80,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Nunito:wght@600;800&display=swap"
           rel="stylesheet"

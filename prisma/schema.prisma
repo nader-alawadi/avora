@@ -9,6 +9,13 @@ datasource db {
 model User {
   id              String    @id @default(cuid())
   name            String?
+  firstName       String?
+  lastName        String?
+  companyName     String?
+  companyWebsite  String?
+  phone           String?
+  phoneVerified   Boolean   @default(false)
+  emailVerified   Boolean   @default(false)
   email           String    @unique
   password        String
   plan            String    @default("LITE")
@@ -361,6 +368,18 @@ model AriaSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("aria_sessions")
+}
+
+model OtpVerification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "email" | "phone"
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("otp_verifications")
 }
 
 model AttendanceLog {
