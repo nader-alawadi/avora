@@ -221,18 +221,23 @@ async function ariaSpeak(
     }
 
     const ctx = getAudioContext();
-    console.log("[ariaSpeak] AudioContext state:", ctx.state);
+    console.log("[ariaSpeak] AudioContext state before resume:", ctx.state);
 
-    if (ctx.state === "suspended") {
-      console.warn("[ariaSpeak] AudioContext suspended — calling resume()");
-      try {
-        await ctx.resume();
-        console.log("[ariaSpeak] AudioContext resumed:", ctx.state);
-      } catch {
-        console.warn("[ariaSpeak] resume() failed — signalling blocked");
-        onBlocked?.();
-        throw new Error("context-suspended");
-      }
+    // Try to resume — in Chrome, this resolves without error even when
+    // autoplay policy keeps the context "suspended". So we MUST re-check
+    // the state afterward and not just trust that resume() resolved.
+    if (ctx.state !== "running") {
+      try { await ctx.resume(); } catch {}
+    }
+    console.log("[ariaSpeak] AudioContext state after resume:", ctx.state);
+
+    if (ctx.state !== "running") {
+      // Still suspended — browser blocked autoplay. Show the button and
+      // fall through to browser TTS immediately (don't schedule into a
+      // suspended context which would hang until the safety timeout).
+      console.warn("[ariaSpeak] AudioContext still suspended — signalling blocked");
+      onBlocked?.();
+      throw new Error("context-suspended");
     }
 
     const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
@@ -497,8 +502,8 @@ export default function ARIAOnboardingPage() {
   const [urlError, setUrlError] = useState("");
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
   const [leads, setLeads] = useState<ARIALead[]>([]);
-  // audioBlocked: browser's autoplay policy blocked play() — show "tap to hear" button
-  const [audioBlocked, setAudioBlocked] = useState(false);
+  // audioBlocked: show "tap to hear" button (set on mount — welcome always needs gesture)
+  const [audioBlocked, setAudioBlocked] = useState(true);
   // Store the pending speak args so the "tap to hear" button can replay them
   const pendingSpeakRef = useRef<{ text: string; lang: "ar" | "en" } | null>(null);
 
@@ -515,7 +520,6 @@ export default function ARIAOnboardingPage() {
 
   // ── Language toggle ───────────────────────────────────────────────────────
   const handleLangToggle = useCallback(() => {
-    // Resume AudioContext synchronously inside the user gesture
     resumeAudioContext();
     setAudioBlocked(false);
 
@@ -534,6 +538,7 @@ export default function ARIAOnboardingPage() {
       pendingSpeakRef.current = { text: msg, lang: newLang };
       setAriaState("speaking");
       ariaSpeak(msg, newLang, () => setAudioBlocked(true)).then(() => {
+        setAudioBlocked(false);
         setAriaState(phaseRef.current === "url-input" ? "listening" : "idle");
       });
     }
@@ -547,6 +552,7 @@ export default function ARIAOnboardingPage() {
     if (!pending) return;
     setAriaState("speaking");
     ariaSpeak(pending.text, pending.lang, () => setAudioBlocked(true)).then(() => {
+      setAudioBlocked(false);
       setAriaState(phaseRef.current === "url-input" ? "listening" : "idle");
     });
   }, []);
@@ -592,6 +598,7 @@ export default function ARIAOnboardingPage() {
         pendingSpeakRef.current = { text: msg, lang: detectedLang };
 
         await ariaSpeak(msg, detectedLang, () => setAudioBlocked(true));
+        setAudioBlocked(false);
 
         setPhase("url-input");
         setAriaState("listening");
@@ -722,18 +729,18 @@ export default function ARIAOnboardingPage() {
           )}
         </AnimatePresence>
 
-        {/* Tap to hear — shown when autoplay is blocked by browser policy */}
+        {/* Tap to hear — shown until user unlocks audio with a gesture */}
         <AnimatePresence>
-          {audioBlocked && (
+          {audioBlocked && ariaMessage && (
             <motion.button
               key="tap-to-hear"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               onClick={handleTapToHear}
-              className="mb-6 flex items-center gap-2 text-xs text-teal-300 hover:text-white px-4 py-2 rounded-full border border-teal-700/50 hover:border-teal-400 bg-teal-900/20 hover:bg-teal-800/30 transition-all"
+              className="mb-6 flex items-center gap-2.5 text-sm font-semibold text-white px-6 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/40 transition-all active:scale-95"
             >
-              🔊 {lang === "ar" ? "اضغط لتسمع إريا" : "Tap to hear ARIA"}
+              🔊 {lang === "ar" ? "اضغط لتسمع إريا" : "Tap to Hear ARIA"}
             </motion.button>
           )}
         </AnimatePresence>
