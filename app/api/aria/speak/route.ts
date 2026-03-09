@@ -54,22 +54,29 @@ export async function POST(req: NextRequest) {
 
   const primaryVoice = language === "ar" ? ARABIC_VOICE_ID : ENGLISH_VOICE_ID;
 
+  console.log(
+    `[speak] key=${ELEVENLABS_API_KEY.slice(0, 10)}... | voice=${primaryVoice} | lang=${language} | text="${text.slice(0, 40)}..."`
+  );
+
   try {
     let response = await callElevenLabs(text, primaryVoice);
+    console.log(`[speak] ElevenLabs primary response: ${response.status}`);
 
     // If primary Arabic voice fails, try Farah as fallback
     if (!response.ok && language === "ar") {
-      console.warn(`Yasmine voice failed (${response.status}), trying Farah fallback`);
+      console.warn(`[speak] Yasmine failed (${response.status}), trying Farah fallback`);
       response = await callElevenLabs(text, ARABIC_VOICE_FALLBACK);
+      console.log(`[speak] Farah fallback response: ${response.status}`);
     }
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => "");
-      console.error("ElevenLabs error:", response.status, errBody);
+      console.error(`[speak] ElevenLabs error ${response.status}:`, errBody);
       return NextResponse.json({ noAudio: true }, { status: 200 });
     }
 
     const audioBuffer = await response.arrayBuffer();
+    console.log(`[speak] Returning audio: ${audioBuffer.byteLength} bytes`);
     return new NextResponse(audioBuffer, {
       headers: {
         "Content-Type": "audio/mpeg",
@@ -77,7 +84,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("ElevenLabs fetch error:", error);
+    console.error("[speak] ElevenLabs fetch error:", error);
     return NextResponse.json({ noAudio: true }, { status: 200 });
   }
 }

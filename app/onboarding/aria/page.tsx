@@ -137,8 +137,12 @@ function getAvailableVoices(): Promise<SpeechSynthesisVoice[]> {
 }
 
 async function speakWithBrowser(text: string, lang: "ar" | "en"): Promise<void> {
-  if (!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) {
+    console.warn("[ariaSpeak] speechSynthesis not available");
+    return;
+  }
   window.speechSynthesis.cancel();
+  console.log("[ariaSpeak] Using browser speech synthesis, lang=", lang);
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = lang === "ar" ? "ar-EG" : "en-US";
@@ -152,57 +156,86 @@ async function speakWithBrowser(text: string, lang: "ar" | "en"): Promise<void> 
     const voice =
       voices.find((v) => v.lang === exactLang) ||
       voices.find((v) => v.lang.toLowerCase().startsWith(lang));
-    if (voice) utterance.voice = voice;
+    if (voice) {
+      utterance.voice = voice;
+      console.log("[ariaSpeak] Browser voice selected:", voice.name);
+    } else {
+      console.warn("[ariaSpeak] No matching browser voice for", lang, "— using default");
+    }
   } catch { /* use default voice */ }
 
   return new Promise((resolve) => {
     let settled = false;
     const finish = () => { if (!settled) { settled = true; resolve(); } };
-    utterance.onend = finish;
-    utterance.onerror = finish;
+    utterance.onend = () => { console.log("[ariaSpeak] Browser speech ended"); finish(); };
+    utterance.onerror = (e) => { console.warn("[ariaSpeak] Browser speech error:", e.error); finish(); };
     window.speechSynthesis.speak(utterance);
-    // Safety timeout in case onend never fires
     setTimeout(finish, text.length * 70 + 3000);
   });
 }
 
 // ─── Core speak (ElevenLabs → browser fallback) ─────────────────────────────
-// Module-level function so it never captures stale state via closures.
+// Module-level. Accepts an optional `onBlocked` callback invoked when the
+// browser's autoplay policy rejects play() — lets the UI show a "tap to hear" button.
 
 async function ariaSpeak(
   text: string,
   lang: "ar" | "en",
-  audioEl: HTMLAudioElement | null
+  audioEl: HTMLAudioElement | null,
+  onBlocked?: () => void
 ): Promise<void> {
+  console.log("[ariaSpeak] START | lang=", lang, "| text=", text.slice(0, 50));
   let usedElevenLabs = false;
 
   try {
+    console.log("[ariaSpeak] Fetching /api/aria/speak...");
     const res = await fetch("/api/aria/speak", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, language: lang }),
     });
+    const ct = res.headers.get("Content-Type") ?? "";
+    console.log("[ariaSpeak] Response:", res.status, "| Content-Type:", ct);
 
-    if (res.ok && res.headers.get("Content-Type")?.includes("audio")) {
+    if (res.ok && ct.includes("audio")) {
       const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      if (audioEl) {
+      console.log("[ariaSpeak] Audio blob:", blob.size, "bytes | type:", blob.type);
+
+      if (blob.size === 0) {
+        console.warn("[ariaSpeak] Empty audio blob — skipping ElevenLabs, using fallback");
+      } else if (audioEl) {
+        const objectUrl = URL.createObjectURL(blob);
         audioEl.src = objectUrl;
-        const playOk = await audioEl.play().then(() => true).catch(() => false);
+        console.log("[ariaSpeak] Calling audioEl.play()...");
+        const playOk = await audioEl.play()
+          .then(() => { console.log("[ariaSpeak] audioEl.play() OK"); return true; })
+          .catch((err: Error) => {
+            console.warn("[ariaSpeak] audioEl.play() blocked:", err.name, "-", err.message);
+            if (err.name === "NotAllowedError") onBlocked?.();
+            return false;
+          });
+
         if (playOk) {
           usedElevenLabs = true;
           await new Promise<void>((resolve) => {
-            audioEl.onended = () => resolve();
-            audioEl.onerror = () => resolve();
+            audioEl.onended = () => { console.log("[ariaSpeak] audioEl ended"); resolve(); };
+            audioEl.onerror = (e) => { console.warn("[ariaSpeak] audioEl error:", e); resolve(); };
           });
         }
         URL.revokeObjectURL(objectUrl);
+      } else {
+        console.warn("[ariaSpeak] audioEl is null — cannot play ElevenLabs audio");
       }
+    } else {
+      const body = await res.text().catch(() => "");
+      console.warn("[ariaSpeak] No audio response. Body:", body.slice(0, 100));
     }
-    // If response is JSON {noAudio:true}, usedElevenLabs stays false → fallback
-  } catch { /* network error → fallback */ }
+  } catch (err) {
+    console.error("[ariaSpeak] Fetch/play error:", err);
+  }
 
   if (!usedElevenLabs) {
+    console.log("[ariaSpeak] Falling back to browser speech synthesis");
     await speakWithBrowser(text, lang);
   }
 }
@@ -442,6 +475,10 @@ export default function ARIAOnboardingPage() {
   const [urlError, setUrlError] = useState("");
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
   const [leads, setLeads] = useState<ARIALead[]>([]);
+  // audioBlocked: browser's autoplay policy blocked play() — show "tap to hear" button
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  // Store the pending speak args so the "tap to hear" button can replay them
+  const pendingSpeakRef = useRef<{ text: string; lang: "ar" | "en" } | null>(null);
 
   // Keep a ref to latest phase/websiteData/userName so the toggle handler
   // can read the current values without going stale inside a closure.
@@ -454,12 +491,28 @@ export default function ARIAOnboardingPage() {
 
   const t = T[lang];
 
+  // ── Unlock audio element synchronously during a user gesture ─────────────
+  // Browsers require a user gesture to allow audio playback. We call .play()
+  // immediately inside the gesture handler (before any await) to "activate"
+  // the element, so the subsequent async .play() call succeeds.
+  function unlockAudio() {
+    const el = audioRef.current;
+    if (!el) return;
+    el.muted = true;
+    el.play()
+      .then(() => { el.pause(); el.muted = false; })
+      .catch(() => { el.muted = false; });
+  }
+
   // ── Language toggle ───────────────────────────────────────────────────────
   function handleLangToggle() {
+    // Unlock audio synchronously while still inside the user gesture handler
+    unlockAudio();
+    setAudioBlocked(false);
+
     const newLang = lang === "ar" ? "en" : "ar";
     setLang(newLang);
 
-    // Re-translate the current ARIA message instantly
     const msg = getCurrentMessage(
       phaseRef.current,
       newLang,
@@ -468,13 +521,25 @@ export default function ARIAOnboardingPage() {
     );
     setAriaMessage(msg);
 
-    // Re-speak in the new language (non-blocking)
     if (msg) {
+      pendingSpeakRef.current = { text: msg, lang: newLang };
       setAriaState("speaking");
-      ariaSpeak(msg, newLang, audioRef.current).then(() => {
+      ariaSpeak(msg, newLang, audioRef.current, () => setAudioBlocked(true)).then(() => {
         setAriaState(phaseRef.current === "url-input" ? "listening" : "idle");
       });
     }
+  }
+
+  // ── "Tap to hear" replay — used when autoplay was blocked ─────────────────
+  function handleTapToHear() {
+    unlockAudio();
+    setAudioBlocked(false);
+    const pending = pendingSpeakRef.current;
+    if (!pending) return;
+    setAriaState("speaking");
+    ariaSpeak(pending.text, pending.lang, audioRef.current, () => setAudioBlocked(true)).then(() => {
+      setAriaState(phaseRef.current === "url-input" ? "listening" : "idle");
+    });
   }
 
   // ── Single initialization effect ──────────────────────────────────────────
@@ -504,8 +569,9 @@ export default function ARIAOnboardingPage() {
         const msg = translations.welcome(firstName);
         setAriaMessage(msg);
         setAriaState("speaking");
+        pendingSpeakRef.current = { text: msg, lang: detectedLang };
 
-        await ariaSpeak(msg, detectedLang, audioRef.current);
+        await ariaSpeak(msg, detectedLang, audioRef.current, () => setAudioBlocked(true));
 
         setPhase("url-input");
         setAriaState("listening");
@@ -524,7 +590,8 @@ export default function ARIAOnboardingPage() {
     setPhase("analyzing");
     setAriaMessage(t.analyzing);
     setAriaState("thinking");
-    await ariaSpeak(t.analyzing, lang, audioRef.current);
+    pendingSpeakRef.current = { text: t.analyzing, lang };
+    await ariaSpeak(t.analyzing, lang, audioRef.current, () => setAudioBlocked(true));
 
     try {
       const res = await fetch("/api/aria/analyze-website", {
@@ -543,7 +610,8 @@ export default function ARIAOnboardingPage() {
       const confirmMsg = `${t.confirmPrefix} "${data.data.productDescription}" ${t.confirmMid} "${data.data.targetMarket}"${t.confirmSuffix}`;
       setAriaMessage(confirmMsg);
       setPhase("confirm-analysis");
-      await ariaSpeak(confirmMsg, lang, audioRef.current);
+      pendingSpeakRef.current = { text: confirmMsg, lang };
+      await ariaSpeak(confirmMsg, lang, audioRef.current, () => setAudioBlocked(true));
       setAriaState("idle");
     } catch {
       setUrlError(t.unreachable);
@@ -557,7 +625,8 @@ export default function ARIAOnboardingPage() {
     setPhase("generating-leads");
     setAriaMessage(t.giftAnnounce);
     setAriaState("thinking");
-    await ariaSpeak(t.giftAnnounce, lang, audioRef.current);
+    pendingSpeakRef.current = { text: t.giftAnnounce, lang };
+    await ariaSpeak(t.giftAnnounce, lang, audioRef.current, () => setAudioBlocked(true));
 
     try {
       const res = await fetch("/api/aria/generate-free-leads", {
@@ -624,13 +693,29 @@ export default function ARIAOnboardingPage() {
           {ariaMessage && (
             <motion.div
               key={ariaMessage}
-              className="mb-8 w-full"
+              className="mb-4 w-full"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
               <ARIABubble text={ariaMessage} dir={t.dir} />
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tap to hear — shown when autoplay is blocked by browser policy */}
+        <AnimatePresence>
+          {audioBlocked && (
+            <motion.button
+              key="tap-to-hear"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              onClick={handleTapToHear}
+              className="mb-6 flex items-center gap-2 text-xs text-teal-300 hover:text-white px-4 py-2 rounded-full border border-teal-700/50 hover:border-teal-400 bg-teal-900/20 hover:bg-teal-800/30 transition-all"
+            >
+              🔊 {lang === "ar" ? "اضغط لتسمع إريا" : "Tap to hear ARIA"}
+            </motion.button>
           )}
         </AnimatePresence>
 
