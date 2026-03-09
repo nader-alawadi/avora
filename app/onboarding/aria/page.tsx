@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ARIAAvatar } from "@/components/aria/ARIAAvatar";
@@ -13,8 +13,7 @@ type Phase =
   | "analyzing"
   | "confirm-analysis"
   | "generating-leads"
-  | "show-leads"
-  | "done";
+  | "show-leads";
 
 interface WebsiteData {
   companyName: string;
@@ -53,18 +52,12 @@ interface ARIALead {
   outreachTemplates: OutreachTemplates | null;
 }
 
-// ─── Language helpers ───────────────────────────────────────────────────────
-
-function detectLang(): "ar" | "en" {
-  if (typeof navigator === "undefined") return "en";
-  const lang = navigator.language?.toLowerCase() ?? "";
-  return lang.startsWith("ar") ? "ar" : "en";
-}
+// ─── Translations ───────────────────────────────────────────────────────────
 
 const T = {
   ar: {
     welcome: (name: string) =>
-      `مرحباً بيك ${name ? name + "!" : "!"} معاك إريا من AVORA، وسعيدة جداً بانضمامك إلينا. أنا هنا أساعدك توصل للعملاء المثاليين ليك. عشان نبدأ صح، ممكن تديني الويب سايت بتاعك؟`,
+      `مرحباً بيك${name ? " " + name : ""}! معاك إريا من AVORA، وسعيدة جداً بانضمامك إلينا. أنا هنا أساعدك توصل للعملاء المثاليين ليك. ممكن تديني الويب سايت بتاعك؟`,
     urlPlaceholder: "https://yourwebsite.com",
     urlLabel: "الويب سايت بتاعك",
     urlButton: "تحليل الويب سايت →",
@@ -75,13 +68,12 @@ const T = {
     confirmYes: "أيوه، صح ✓",
     confirmNo: "لا، في تعديل",
     giftAnnounce:
-      "🎁 هديتك من AVORA! أنا جهزتلك 5 ليدز مؤهلة مجاناً بناءً على بيزنسك. هتلاقيهم في الـ CRM بتاعك دلوقتي!",
+      "🎁 هديتك من AVORA! جهزتلك 5 ليدز مؤهلة مجاناً بناءً على بيزنسك. هتلاقيهم في CRM بتاعك دلوقتي!",
     generatingLeads: "بجهز الليدز المجانية بتاعتك...",
     freeleadsTitle: "5 ليدز مجانية — هدية من AVORA 🎁",
     ctaText: "عاوز تاخد 5 ليدز أكتر؟ بس أجاوب على 5 أسئلة بسيطة معايا!",
     ctaButton: "يلا نبدأ! 🚀",
     goToCrm: "روح CRM",
-    fitScore: "ICP Fit",
     bestChannel: "أفضل قناة",
     bestTime: "أفضل وقت",
     linkedin: "لينكد إن",
@@ -93,11 +85,11 @@ const T = {
     replacing: "بجهز ليد بديل...",
     invalidUrl: "الرابط مش صحيح. لازم يبدأ بـ https:// أو http://",
     unreachable: "مقدرتش أوصل للويب سايت ده. تأكد من الرابط وحاول تاني.",
-    dir: "rtl",
+    dir: "rtl" as const,
   },
   en: {
     welcome: (name: string) =>
-      `Welcome${name ? " " + name : ""}! I'm ARIA from AVORA, and I'm thrilled to have you here. I'm going to help you find your perfect customers. To get started, could you share your website with me?`,
+      `Welcome${name ? " " + name : ""}! I'm ARIA from AVORA, and I'm thrilled to have you here. I'm going to help you find your perfect customers. Could you share your website with me?`,
     urlPlaceholder: "https://yourwebsite.com",
     urlLabel: "Your website",
     urlButton: "Analyze Website →",
@@ -108,13 +100,12 @@ const T = {
     confirmYes: "Yes, that's right ✓",
     confirmNo: "Let me correct that",
     giftAnnounce:
-      "🎁 Here's your gift from AVORA! I've prepared 5 qualified leads for you based on your business — they're already in your CRM!",
+      "🎁 Here's your gift from AVORA! I've prepared 5 qualified leads based on your business — they're already in your CRM!",
     generatingLeads: "Preparing your free leads...",
     freeleadsTitle: "5 Free Leads — Your Gift from AVORA 🎁",
     ctaText: "Want 5 more leads? Just answer 5 quick questions with me!",
     ctaButton: "Let's Go! 🚀",
     goToCrm: "Go to CRM",
-    fitScore: "ICP Fit",
     bestChannel: "Best Channel",
     bestTime: "Best Time",
     linkedin: "LinkedIn",
@@ -126,52 +117,94 @@ const T = {
     replacing: "Generating a replacement lead...",
     invalidUrl: "Invalid URL. It must start with https:// or http://",
     unreachable: "Couldn't reach that website. Please check the URL and try again.",
-    dir: "ltr",
+    dir: "ltr" as const,
   },
 } as const;
 
-// ─── Web Speech API fallback ────────────────────────────────────────────────
+// ─── Web Speech API (browser fallback) ─────────────────────────────────────
 
-function getVoices(): Promise<SpeechSynthesisVoice[]> {
+function getAvailableVoices(): Promise<SpeechSynthesisVoice[]> {
   return new Promise((resolve) => {
     const voices = window.speechSynthesis.getVoices();
     if (voices.length > 0) { resolve(voices); return; }
-    const onChanged = () => { resolve(window.speechSynthesis.getVoices()); };
-    window.speechSynthesis.addEventListener("voiceschanged", onChanged, { once: true });
+    window.speechSynthesis.addEventListener(
+      "voiceschanged",
+      () => resolve(window.speechSynthesis.getVoices()),
+      { once: true }
+    );
     setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1500);
   });
 }
 
 async function speakWithBrowser(text: string, lang: "ar" | "en"): Promise<void> {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
 
   const utterance = new SpeechSynthesisUtterance(text);
-  const preferredLang = lang === "ar" ? "ar-EG" : "en-US";
-  utterance.lang = preferredLang;
+  utterance.lang = lang === "ar" ? "ar-EG" : "en-US";
   utterance.rate = lang === "ar" ? 0.88 : 0.92;
   utterance.pitch = 1.1;
   utterance.volume = 1;
 
   try {
-    const voices = await getVoices();
-    // Prefer exact match → prefix match → any voice
+    const voices = await getAvailableVoices();
+    const exactLang = lang === "ar" ? "ar-EG" : "en-US";
     const voice =
-      voices.find((v) => v.lang === preferredLang) ||
-      voices.find((v) => v.lang.toLowerCase().startsWith(lang)) ||
-      voices.find((v) => v.default) ||
-      voices[0];
+      voices.find((v) => v.lang === exactLang) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith(lang));
     if (voice) utterance.voice = voice;
-  } catch { /* proceed without specific voice */ }
+  } catch { /* use default voice */ }
 
   return new Promise((resolve) => {
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
+    let settled = false;
+    const finish = () => { if (!settled) { settled = true; resolve(); } };
+    utterance.onend = finish;
+    utterance.onerror = finish;
     window.speechSynthesis.speak(utterance);
-    // Safety: resolve after estimated duration if onend doesn't fire
-    const estMs = Math.max(3000, text.length * 70);
-    setTimeout(resolve, estMs);
+    // Safety timeout in case onend never fires
+    setTimeout(finish, text.length * 70 + 3000);
   });
+}
+
+// ─── Core speak (ElevenLabs → browser fallback) ─────────────────────────────
+// Module-level function so it never captures stale state via closures.
+
+async function ariaSpeak(
+  text: string,
+  lang: "ar" | "en",
+  audioEl: HTMLAudioElement | null
+): Promise<void> {
+  let usedElevenLabs = false;
+
+  try {
+    const res = await fetch("/api/aria/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, language: lang }),
+    });
+
+    if (res.ok && res.headers.get("Content-Type")?.includes("audio")) {
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      if (audioEl) {
+        audioEl.src = objectUrl;
+        const playOk = await audioEl.play().then(() => true).catch(() => false);
+        if (playOk) {
+          usedElevenLabs = true;
+          await new Promise<void>((resolve) => {
+            audioEl.onended = () => resolve();
+            audioEl.onerror = () => resolve();
+          });
+        }
+        URL.revokeObjectURL(objectUrl);
+      }
+    }
+    // If response is JSON {noAudio:true}, usedElevenLabs stays false → fallback
+  } catch { /* network error → fallback */ }
+
+  if (!usedElevenLabs) {
+    await speakWithBrowser(text, lang);
+  }
 }
 
 // ─── ICP Fit Score Badge ────────────────────────────────────────────────────
@@ -179,23 +212,15 @@ async function speakWithBrowser(text: string, lang: "ar" | "en"): Promise<void> 
 function FitScoreBadge({ score }: { score: number }) {
   const color = score >= 80 ? "#22c55e" : score >= 60 ? "#eab308" : "#ef4444";
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative w-10 h-10">
-        <svg viewBox="0 0 36 36" className="w-10 h-10 -rotate-90">
-          <circle cx="18" cy="18" r="15" fill="none" stroke="#1a3a3a" strokeWidth="3" />
-          <circle
-            cx="18" cy="18" r="15"
-            fill="none"
-            stroke={color}
-            strokeWidth="3"
-            strokeDasharray={`${(score / 100) * 94} 94`}
-            strokeLinecap="round"
-          />
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
-          {score}
-        </span>
-      </div>
+    <div className="relative w-10 h-10">
+      <svg viewBox="0 0 36 36" className="w-10 h-10 -rotate-90">
+        <circle cx="18" cy="18" r="15" fill="none" stroke="#1a3a3a" strokeWidth="3" />
+        <circle cx="18" cy="18" r="15" fill="none" stroke={color} strokeWidth="3"
+          strokeDasharray={`${(score / 100) * 94} 94`} strokeLinecap="round" />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+        {score}
+      </span>
     </div>
   );
 }
@@ -203,11 +228,7 @@ function FitScoreBadge({ score }: { score: number }) {
 // ─── Lead Card ──────────────────────────────────────────────────────────────
 
 function LeadCard({
-  lead,
-  index,
-  lang,
-  websiteData,
-  onReplace,
+  lead, index, lang, websiteData, onReplace,
 }: {
   lead: ARIALead;
   index: number;
@@ -254,7 +275,6 @@ function LeadCard({
       transition={{ delay: index * 0.15, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       className="bg-[#0d2626] border border-teal-800/40 rounded-2xl overflow-hidden"
     >
-      {/* Header */}
       <div className="p-4 border-b border-teal-800/30">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -263,9 +283,7 @@ function LeadCard({
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/50">
               <span className="font-medium text-white/70">{lead.company}</span>
               {lead.industry && (
-                <span className="px-2 py-0.5 bg-teal-900/50 text-teal-300 rounded-full">
-                  {lead.industry}
-                </span>
+                <span className="px-2 py-0.5 bg-teal-900/50 text-teal-300 rounded-full">{lead.industry}</span>
               )}
               {lead.country && <span>{lead.country}</span>}
               {lead.employeeCount && <span>👥 {lead.employeeCount}</span>}
@@ -281,7 +299,9 @@ function LeadCard({
             </a>
           )}
           {lead.linkedinUrl && (
-            <a href={lead.linkedinUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2.5 py-1 bg-blue-900/30 hover:bg-blue-800/30 text-blue-300 rounded-lg transition-colors">
+            <a href={lead.linkedinUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2.5 py-1 bg-blue-900/30 hover:bg-blue-800/30 text-blue-300 rounded-lg transition-colors"
+            >
               in LinkedIn
             </a>
           )}
@@ -293,7 +313,6 @@ function LeadCard({
         </div>
       </div>
 
-      {/* ICP reason + personality */}
       <div className="p-4 space-y-2 border-b border-teal-800/20">
         {lead.icpFitReason && (
           <p className="text-xs text-white/60">
@@ -319,14 +338,11 @@ function LeadCard({
         </div>
       </div>
 
-      {/* Outreach templates */}
       {templates && (
         <div className="p-4 border-b border-teal-800/20">
           <div className="flex gap-1 mb-3 text-xs">
             {(["linkedin", "email", "whatsapp", "coldCall"] as const).map((ch) => (
-              <button
-                key={ch}
-                onClick={() => setTab(ch)}
+              <button key={ch} onClick={() => setTab(ch)}
                 className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
                   tab === ch ? "bg-teal-600 text-white" : "bg-white/5 text-white/40 hover:text-white/70"
                 }`}
@@ -341,24 +357,18 @@ function LeadCard({
         </div>
       )}
 
-      {/* Rating buttons */}
       <div className="p-3 flex gap-2">
         {rating === "good" ? (
-          <div className="flex-1 text-center text-xs text-green-400 py-2">
-            ✓ Marked as good lead
-          </div>
+          <div className="flex-1 text-center text-xs text-green-400 py-2">✓ Marked as good lead</div>
         ) : (
           <>
-            <button
-              onClick={() => setRating("good")}
+            <button onClick={() => setRating("good")}
               className="flex-1 text-xs py-2 rounded-xl font-medium bg-green-900/20 text-green-400 hover:bg-green-800/30 transition-all"
             >
               {t.goodLead}
             </button>
             {!replaced && (
-              <button
-                onClick={() => { setRating("bad"); handleBadLead(); }}
-                disabled={replacing}
+              <button onClick={() => { setRating("bad"); handleBadLead(); }} disabled={replacing}
                 className="flex-1 text-xs py-2 rounded-xl font-medium bg-red-900/20 text-red-400 hover:bg-red-800/30 disabled:opacity-50 transition-all"
               >
                 {replacing ? t.replacing : t.badLead}
@@ -373,7 +383,7 @@ function LeadCard({
 
 // ─── ARIA Message Bubble ────────────────────────────────────────────────────
 
-function ARIABubble({ text, dir }: { text: string; dir: string }) {
+function ARIABubble({ text, dir }: { text: string; dir: "ltr" | "rtl" }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.97 }}
@@ -393,14 +403,12 @@ function ARIABubble({ text, dir }: { text: string; dir: string }) {
 
 export default function ARIAOnboardingPage() {
   const router = useRouter();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // ── State ──
-  // lang defaults to "en" until detectLang() runs client-side
+  // lang starts as "en" for SSR/hydration consistency.
+  // It is updated synchronously at the very start of the initialization effect —
+  // before any speech or UI transitions fire — so the user always sees the correct language.
   const [lang, setLang] = useState<"ar" | "en">("en");
-  // "ready" becomes true after BOTH language detection AND user name fetch complete.
-  // The welcome sequence only starts once ready=true — fixes the "always English" bug.
-  const [ready, setReady] = useState(false);
-
   const [ariaState, setAriaState] = useState<ARIAState>("idle");
   const [phase, setPhase] = useState<Phase>("welcome");
   const [ariaMessage, setAriaMessage] = useState("");
@@ -409,87 +417,48 @@ export default function ARIAOnboardingPage() {
   const [urlError, setUrlError] = useState("");
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
   const [leads, setLeads] = useState<ARIALead[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const t = T[lang];
 
-  // ── Step 1: detect lang + fetch user → set ready ────────────────────────
+  // ── Single initialization effect ──────────────────────────────────────────
+  //
+  // Correct pattern (per bug report):
+  //   1. Detect language SYNCHRONOUSLY (navigator is always available in useEffect)
+  //   2. setLang() immediately so the next render uses the right translations
+  //   3. Fetch user name (async)
+  //   4. ONLY THEN trigger the welcome speech — with the right lang + name
+  //
+  // This ensures the welcome message is NEVER in the wrong language.
+  //
   useEffect(() => {
-    // Detect language synchronously first so the next render already has the right lang
-    const detectedLang = detectLang();
+    // Step 1 — synchronous language detection
+    const detectedLang: "ar" | "en" = navigator.language?.toLowerCase().startsWith("ar")
+      ? "ar"
+      : "en";
     setLang(detectedLang);
 
-    // Then fetch user name (async)
+    // Step 2 — fetch user name, then speak welcome
+    const translations = T[detectedLang]; // captured in closure, never stale
+
     fetch("/api/auth/me")
       .then((r) => r.json())
-      .then((d) => {
-        const name = d?.user?.name ?? d?.name ?? "";
-        setUserName(name ? name.split(" ")[0] : "");
-      })
-      .catch(() => {})
-      .finally(() => setReady(true));
-  }, []);
+      .then((d) => String(d?.user?.name ?? d?.name ?? ""))
+      .catch(() => "")
+      .then(async (fullName) => {
+        const firstName = fullName ? fullName.split(" ")[0] : "";
+        setUserName(firstName);
 
-  // ── Step 2: speak helper — ElevenLabs → Web Speech API fallback ─────────
-  const speak = useCallback(async (text: string, currentLang: "ar" | "en") => {
-    setAriaState("speaking");
-    let usedElevenLabs = false;
+        // Step 3 — build and speak welcome in the correct language
+        const msg = translations.welcome(firstName);
+        setAriaMessage(msg);
+        setAriaState("speaking");
 
-    try {
-      const res = await fetch("/api/aria/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, language: currentLang }),
+        await ariaSpeak(msg, detectedLang, audioRef.current);
+
+        setPhase("url-input");
+        setAriaState("listening");
       });
-
-      // ElevenLabs returned actual audio
-      if (res.ok && res.headers.get("Content-Type")?.includes("audio")) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = audioRef.current;
-        if (audio) {
-          usedElevenLabs = true;
-          audio.src = url;
-          await audio.play().catch(() => { usedElevenLabs = false; });
-          if (usedElevenLabs) {
-            await new Promise<void>((resolve) => {
-              audio.onended = () => resolve();
-              audio.onerror = () => resolve();
-            });
-          }
-          URL.revokeObjectURL(url);
-        }
-      }
-    } catch { /* fall through to Web Speech */ }
-
-    // Fallback: browser Web Speech API
-    if (!usedElevenLabs) {
-      await speakWithBrowser(text, currentLang);
-    }
-
-    setAriaState("idle");
-  }, []);
-
-  // ── Step 3: fire welcome when ready (lang + userName are both resolved) ──
-  useEffect(() => {
-    if (!ready || phase !== "welcome") return;
-
-    // At this point lang and userName are both correctly set.
-    // Read them from closure — they reflect the latest render values.
-    const currentLang = detectLang(); // re-read to be safe (same value as lang state)
-    const translations = T[currentLang];
-    const msg = translations.welcome(userName);
-
-    setLang(currentLang); // ensure UI is also in sync
-    setAriaMessage(msg);
-    setAriaState("speaking");
-
-    speak(msg, currentLang).then(() => {
-      setPhase("url-input");
-      setAriaState("listening");
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+  }, []); // runs once on mount only
 
   // ── URL analysis ─────────────────────────────────────────────────────────
   async function handleUrlSubmit() {
@@ -503,7 +472,7 @@ export default function ARIAOnboardingPage() {
     setPhase("analyzing");
     setAriaMessage(t.analyzing);
     setAriaState("thinking");
-    await speak(t.analyzing, lang);
+    await ariaSpeak(t.analyzing, lang, audioRef.current);
 
     try {
       const res = await fetch("/api/aria/analyze-website", {
@@ -512,19 +481,17 @@ export default function ARIAOnboardingPage() {
         body: JSON.stringify({ url: trimmed }),
       });
       const data = await res.json();
-
       if (!res.ok) {
         setUrlError(data.error ?? t.unreachable);
         setPhase("url-input");
         setAriaState("listening");
         return;
       }
-
       setWebsiteData(data.data);
       const confirmMsg = `${t.confirmPrefix} "${data.data.productDescription}" ${t.confirmMid} "${data.data.targetMarket}"${t.confirmSuffix}`;
       setAriaMessage(confirmMsg);
       setPhase("confirm-analysis");
-      await speak(confirmMsg, lang);
+      await ariaSpeak(confirmMsg, lang, audioRef.current);
       setAriaState("idle");
     } catch {
       setUrlError(t.unreachable);
@@ -538,7 +505,7 @@ export default function ARIAOnboardingPage() {
     setPhase("generating-leads");
     setAriaMessage(t.giftAnnounce);
     setAriaState("thinking");
-    await speak(t.giftAnnounce, lang);
+    await ariaSpeak(t.giftAnnounce, lang, audioRef.current);
 
     try {
       const res = await fetch("/api/aria/generate-free-leads", {
@@ -649,7 +616,9 @@ export default function ARIAOnboardingPage() {
                 </motion.button>
               </div>
               {urlError && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs text-center">
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="text-red-400 text-xs text-center"
+                >
                   {urlError}
                 </motion.p>
               )}
@@ -701,18 +670,14 @@ export default function ARIAOnboardingPage() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <motion.button
-                  onClick={handleConfirm}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
+                <motion.button onClick={handleConfirm} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                   className="flex-1 py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl text-sm transition-colors"
                 >
                   {t.confirmYes}
                 </motion.button>
                 <motion.button
                   onClick={() => { setPhase("url-input"); setAriaMessage(""); }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                   className="flex-1 py-3.5 bg-white/5 hover:bg-white/10 text-white/70 font-semibold rounded-xl text-sm transition-colors border border-white/10"
                 >
                   {t.confirmNo}
@@ -740,9 +705,7 @@ export default function ARIAOnboardingPage() {
               />
               <p className="text-white/60 text-sm">{t.generatingLeads}</p>
               {[1, 2, 3].map((i) => (
-                <motion.div
-                  key={i}
-                  className="w-full h-24 rounded-2xl bg-teal-900/20"
+                <motion.div key={i} className="w-full h-24 rounded-2xl bg-teal-900/20"
                   animate={{ opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
                 />
@@ -760,11 +723,7 @@ export default function ARIAOnboardingPage() {
               animate={{ opacity: 1 }}
               className="w-full space-y-4"
             >
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center mb-6"
-              >
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-6">
                 <h2 className="text-xl font-bold text-white">{t.freeleadsTitle}</h2>
               </motion.div>
 
@@ -789,16 +748,14 @@ export default function ARIAOnboardingPage() {
                 <div className="flex gap-3 justify-center flex-wrap">
                   <motion.button
                     onClick={() => router.push("/onboarding/tasks")}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                     className="px-8 py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl text-sm transition-colors shadow-lg"
                   >
                     {t.ctaButton}
                   </motion.button>
                   <motion.button
                     onClick={() => router.push("/dashboard")}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                     className="px-6 py-3.5 bg-white/5 hover:bg-white/10 text-white/60 font-medium rounded-xl text-sm transition-colors border border-white/10"
                   >
                     {t.goToCrm}
