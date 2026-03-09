@@ -5,54 +5,34 @@ const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY ?? "";
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 const MODEL_ID = "eleven_multilingual_v2";
 
-// Default voice — Rachel (works well for multilingual including Arabic)
-const DEFAULT_VOICE_ID = process.env.ELEVENLABS_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM";
-
-// Cache the best Arabic voice ID across requests (in-process memory)
-let cachedArabicVoiceId: string | null = null;
+// Voices from "My Voices" in the ElevenLabs account
+const ARABIC_VOICE_ID = "L10lEremDiJfPicq5CPh";  // Yasmine — Human-Like Banking Agent (professional, female, ar)
+const ARABIC_VOICE_FALLBACK = "4wf10lgibMnboGJGCLrP"; // Farah — Smooth, Calm and Warm (professional, female, ar)
+const ENGLISH_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah — Mature, Reassuring, Confident (premade, female, en)
 
 function isConfigured(): boolean {
-  return (
-    ELEVENLABS_API_KEY.length > 0 &&
-    !ELEVENLABS_API_KEY.startsWith("your-") &&
-    !ELEVENLABS_API_KEY.startsWith("sk-ant-placeholder")
-  );
+  return ELEVENLABS_API_KEY.length > 0 && !ELEVENLABS_API_KEY.startsWith("your-");
 }
 
-/** Fetch all available voices and pick the best Arabic-capable female voice. */
-async function getBestArabicVoiceId(): Promise<string> {
-  if (cachedArabicVoiceId) return cachedArabicVoiceId;
-
-  try {
-    const res = await fetch(`${ELEVENLABS_BASE}/voices`, {
-      headers: { "xi-api-key": ELEVENLABS_API_KEY },
-    });
-    if (!res.ok) return DEFAULT_VOICE_ID;
-
-    const data = await res.json();
-    const voices: Array<{
-      voice_id: string;
-      name: string;
-      labels?: Record<string, string>;
-      fine_tuning?: { is_allowed_to_fine_tune?: boolean };
-    }> = data.voices ?? [];
-
-    // Prefer Arabic-labelled female voices, then any Arabic voice, then default
-    const arabicFemale = voices.find(
-      (v) =>
-        (v.labels?.language === "ar" || v.labels?.accent?.toLowerCase().includes("arab")) &&
-        v.labels?.gender?.toLowerCase() === "female"
-    );
-    const arabicAny = voices.find(
-      (v) =>
-        v.labels?.language === "ar" || v.labels?.accent?.toLowerCase().includes("arab")
-    );
-
-    cachedArabicVoiceId = arabicFemale?.voice_id ?? arabicAny?.voice_id ?? DEFAULT_VOICE_ID;
-    return cachedArabicVoiceId;
-  } catch {
-    return DEFAULT_VOICE_ID;
-  }
+async function callElevenLabs(text: string, voiceId: string): Promise<Response> {
+  return fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": ELEVENLABS_API_KEY,
+      "Content-Type": "application/json",
+      Accept: "audio/mpeg",
+    },
+    body: JSON.stringify({
+      text,
+      model_id: MODEL_ID,
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.75,
+        style: 0.3,
+        use_speaker_boost: true,
+      },
+    }),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -72,28 +52,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ noAudio: true }, { status: 200 });
   }
 
-  // Pick voice: for Arabic, try to find a proper Arabic voice
-  const voiceId = language === "ar" ? await getBestArabicVoiceId() : DEFAULT_VOICE_ID;
+  const primaryVoice = language === "ar" ? ARABIC_VOICE_ID : ENGLISH_VOICE_ID;
 
   try {
-    const response = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}`, {
-      method: "POST",
-      headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-        Accept: "audio/mpeg",
-      },
-      body: JSON.stringify({
-        text,
-        model_id: MODEL_ID,
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.3,
-          use_speaker_boost: true,
-        },
-      }),
-    });
+    let response = await callElevenLabs(text, primaryVoice);
+
+    // If primary Arabic voice fails, try Farah as fallback
+    if (!response.ok && language === "ar") {
+      console.warn(`Yasmine voice failed (${response.status}), trying Farah fallback`);
+      response = await callElevenLabs(text, ARABIC_VOICE_FALLBACK);
+    }
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => "");

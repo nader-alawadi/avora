@@ -432,7 +432,15 @@ export default function ARIAOnboardingPage() {
   //
   useEffect(() => {
     // Step 1 — synchronous language detection
-    const detectedLang: "ar" | "en" = navigator.language?.toLowerCase().startsWith("ar")
+    // Check navigator.language AND the full navigator.languages array so we
+    // catch Arabic even when it's not the primary browser language.
+    const allLangs = [
+      navigator.language ?? "",
+      ...(navigator.languages ?? []),
+    ];
+    const detectedLang: "ar" | "en" = allLangs.some((l) =>
+      l.toLowerCase().startsWith("ar")
+    )
       ? "ar"
       : "en";
     setLang(detectedLang);
