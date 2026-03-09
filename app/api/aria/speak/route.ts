@@ -6,16 +6,23 @@ const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 const MODEL_ID = "eleven_multilingual_v2";
 
 // Voices from "My Voices" in the ElevenLabs account
-const ARABIC_VOICE_ID = "L10lEremDiJfPicq5CPh";  // Yasmine — Human-Like Banking Agent (professional, female, ar)
-const ARABIC_VOICE_FALLBACK = "4wf10lgibMnboGJGCLrP"; // Farah — Smooth, Calm and Warm (professional, female, ar)
-const ENGLISH_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah — Mature, Reassuring, Confident (premade, female, en)
+const ARABIC_VOICE_ID = "L10lEremDiJfPicq5CPh";  // Yasmine — professional female Arabic
+const ARABIC_VOICE_FALLBACK = "4wf10lgibMnboGJGCLrP"; // Farah — fallback Arabic
+const ENGLISH_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah — premade female English
+
+const VOICE_SETTINGS = {
+  stability: 0.75,
+  similarity_boost: 0.85,
+  style: 0.3,
+  use_speaker_boost: true,
+};
 
 function isConfigured(): boolean {
   return ELEVENLABS_API_KEY.length > 0 && !ELEVENLABS_API_KEY.startsWith("your-");
 }
 
-async function callElevenLabs(text: string, voiceId: string): Promise<Response> {
-  return fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}`, {
+async function callStream(text: string, voiceId: string): Promise<Response> {
+  return fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}/stream`, {
     method: "POST",
     headers: {
       "xi-api-key": ELEVENLABS_API_KEY,
@@ -25,12 +32,7 @@ async function callElevenLabs(text: string, voiceId: string): Promise<Response> 
     body: JSON.stringify({
       text,
       model_id: MODEL_ID,
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-        style: 0.3,
-        use_speaker_boost: true,
-      },
+      voice_settings: VOICE_SETTINGS,
     }),
   });
 }
@@ -49,37 +51,37 @@ export async function POST(req: NextRequest) {
   }
 
   if (!isConfigured()) {
+    console.warn("[speak] ElevenLabs not configured — returning noAudio");
     return NextResponse.json({ noAudio: true }, { status: 200 });
   }
 
   const primaryVoice = language === "ar" ? ARABIC_VOICE_ID : ENGLISH_VOICE_ID;
-
   console.log(
     `[speak] key=${ELEVENLABS_API_KEY.slice(0, 10)}... | voice=${primaryVoice} | lang=${language} | text="${text.slice(0, 40)}..."`
   );
 
   try {
-    let response = await callElevenLabs(text, primaryVoice);
-    console.log(`[speak] ElevenLabs primary response: ${response.status}`);
+    let upstream = await callStream(text, primaryVoice);
+    console.log(`[speak] ElevenLabs /stream response: ${upstream.status}`);
 
-    // If primary Arabic voice fails, try Farah as fallback
-    if (!response.ok && language === "ar") {
-      console.warn(`[speak] Yasmine failed (${response.status}), trying Farah fallback`);
-      response = await callElevenLabs(text, ARABIC_VOICE_FALLBACK);
-      console.log(`[speak] Farah fallback response: ${response.status}`);
+    if (!upstream.ok && language === "ar") {
+      console.warn(`[speak] Yasmine failed (${upstream.status}), trying Farah fallback`);
+      upstream = await callStream(text, ARABIC_VOICE_FALLBACK);
+      console.log(`[speak] Farah fallback response: ${upstream.status}`);
     }
 
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => "");
-      console.error(`[speak] ElevenLabs error ${response.status}:`, errBody);
+    if (!upstream.ok) {
+      const errBody = await upstream.text().catch(() => "");
+      console.error(`[speak] ElevenLabs error ${upstream.status}:`, errBody);
       return NextResponse.json({ noAudio: true }, { status: 200 });
     }
 
-    const audioBuffer = await response.arrayBuffer();
-    console.log(`[speak] Returning audio: ${audioBuffer.byteLength} bytes`);
-    return new NextResponse(audioBuffer, {
+    // Stream directly to the client — no buffering in the server
+    console.log("[speak] Streaming audio to client");
+    return new NextResponse(upstream.body, {
       headers: {
         "Content-Type": "audio/mpeg",
+        "Transfer-Encoding": "chunked",
         "Cache-Control": "no-store",
       },
     });

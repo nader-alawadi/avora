@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ARIAAvatar } from "@/components/aria/ARIAAvatar";
@@ -121,20 +121,27 @@ const T = {
   },
 } as const;
 
-// ─── Web Speech API (browser fallback) ─────────────────────────────────────
+// ─── Shared AudioContext (singleton) ────────────────────────────────────────
+// Reusing one context avoids the "too many AudioContexts" browser warning.
 
-function getAvailableVoices(): Promise<SpeechSynthesisVoice[]> {
-  return new Promise((resolve) => {
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) { resolve(voices); return; }
-    window.speechSynthesis.addEventListener(
-      "voiceschanged",
-      () => resolve(window.speechSynthesis.getVoices()),
-      { once: true }
-    );
-    setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1500);
-  });
+let sharedAudioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext {
+  if (!sharedAudioContext || sharedAudioContext.state === "closed") {
+    sharedAudioContext = new AudioContext();
+  }
+  return sharedAudioContext;
 }
+
+/** Call this inside any user-gesture handler to resume a suspended context. */
+function resumeAudioContext(): void {
+  const ctx = getAudioContext();
+  if (ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
+}
+
+// ─── Browser Speech Synthesis fallback ──────────────────────────────────────
 
 async function speakWithBrowser(text: string, lang: "ar" | "en"): Promise<void> {
   if (!("speechSynthesis" in window)) {
@@ -142,50 +149,51 @@ async function speakWithBrowser(text: string, lang: "ar" | "en"): Promise<void> 
     return;
   }
   window.speechSynthesis.cancel();
-  console.log("[ariaSpeak] Using browser speech synthesis, lang=", lang);
+  console.log("[ariaSpeak] Using browser TTS, lang=", lang);
 
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang === "ar" ? "ar-EG" : "en-US";
-  utterance.rate = lang === "ar" ? 0.88 : 0.92;
-  utterance.pitch = 1.1;
+  utterance.lang = lang === "ar" ? "ar-SA" : "en-US";
+  utterance.rate = 0.9;
   utterance.volume = 1;
 
-  try {
-    const voices = await getAvailableVoices();
-    const exactLang = lang === "ar" ? "ar-EG" : "en-US";
-    const voice =
-      voices.find((v) => v.lang === exactLang) ||
-      voices.find((v) => v.lang.toLowerCase().startsWith(lang));
-    if (voice) {
-      utterance.voice = voice;
-      console.log("[ariaSpeak] Browser voice selected:", voice.name);
-    } else {
-      console.warn("[ariaSpeak] No matching browser voice for", lang, "— using default");
-    }
-  } catch { /* use default voice */ }
+  // Try to pick a matching voice
+  await new Promise<void>((res) => {
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) { res(); return; }
+    window.speechSynthesis.addEventListener("voiceschanged", () => res(), { once: true });
+    setTimeout(res, 1200);
+  });
+
+  const voices = window.speechSynthesis.getVoices();
+  const bcp = lang === "ar" ? "ar" : "en";
+  const match = voices.find((v) => v.lang.toLowerCase().startsWith(bcp));
+  if (match) {
+    utterance.voice = match;
+    console.log("[ariaSpeak] Browser voice:", match.name);
+  } else {
+    console.warn("[ariaSpeak] No browser voice for", lang);
+  }
 
   return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => { if (!settled) { settled = true; resolve(); } };
-    utterance.onend = () => { console.log("[ariaSpeak] Browser speech ended"); finish(); };
-    utterance.onerror = (e) => { console.warn("[ariaSpeak] Browser speech error:", e.error); finish(); };
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    utterance.onend = finish;
+    utterance.onerror = (e) => { console.warn("[ariaSpeak] TTS error:", e.error); finish(); };
     window.speechSynthesis.speak(utterance);
-    setTimeout(finish, text.length * 70 + 3000);
+    setTimeout(finish, text.length * 70 + 4000);
   });
 }
 
-// ─── Core speak (ElevenLabs → browser fallback) ─────────────────────────────
-// Module-level. Accepts an optional `onBlocked` callback invoked when the
-// browser's autoplay policy rejects play() — lets the UI show a "tap to hear" button.
+// ─── Core speak — Web Audio API + ElevenLabs stream ─────────────────────────
+// Downloads the full MP3 from the server, decodes with AudioContext, then plays.
+// Falls back to browser TTS if anything fails.
 
 async function ariaSpeak(
   text: string,
   lang: "ar" | "en",
-  audioEl: HTMLAudioElement | null,
   onBlocked?: () => void
 ): Promise<void> {
   console.log("[ariaSpeak] START | lang=", lang, "| text=", text.slice(0, 50));
-  let usedElevenLabs = false;
 
   try {
     console.log("[ariaSpeak] Fetching /api/aria/speak...");
@@ -197,47 +205,62 @@ async function ariaSpeak(
     const ct = res.headers.get("Content-Type") ?? "";
     console.log("[ariaSpeak] Response:", res.status, "| Content-Type:", ct);
 
-    if (res.ok && ct.includes("audio")) {
-      const blob = await res.blob();
-      console.log("[ariaSpeak] Audio blob:", blob.size, "bytes | type:", blob.type);
-
-      if (blob.size === 0) {
-        console.warn("[ariaSpeak] Empty audio blob — skipping ElevenLabs, using fallback");
-      } else if (audioEl) {
-        const objectUrl = URL.createObjectURL(blob);
-        audioEl.src = objectUrl;
-        console.log("[ariaSpeak] Calling audioEl.play()...");
-        const playOk = await audioEl.play()
-          .then(() => { console.log("[ariaSpeak] audioEl.play() OK"); return true; })
-          .catch((err: Error) => {
-            console.warn("[ariaSpeak] audioEl.play() blocked:", err.name, "-", err.message);
-            if (err.name === "NotAllowedError") onBlocked?.();
-            return false;
-          });
-
-        if (playOk) {
-          usedElevenLabs = true;
-          await new Promise<void>((resolve) => {
-            audioEl.onended = () => { console.log("[ariaSpeak] audioEl ended"); resolve(); };
-            audioEl.onerror = (e) => { console.warn("[ariaSpeak] audioEl error:", e); resolve(); };
-          });
-        }
-        URL.revokeObjectURL(objectUrl);
-      } else {
-        console.warn("[ariaSpeak] audioEl is null — cannot play ElevenLabs audio");
-      }
-    } else {
+    if (!res.ok || !ct.includes("audio")) {
       const body = await res.text().catch(() => "");
-      console.warn("[ariaSpeak] No audio response. Body:", body.slice(0, 100));
+      console.warn("[ariaSpeak] No audio from server. Body:", body.slice(0, 100));
+      throw new Error("no-audio");
     }
+
+    // Wait for the full response body (avoids early cut-off)
+    const arrayBuffer = await res.arrayBuffer();
+    console.log("[ariaSpeak] Full buffer received:", arrayBuffer.byteLength, "bytes");
+
+    if (arrayBuffer.byteLength === 0) {
+      console.warn("[ariaSpeak] Empty buffer");
+      throw new Error("empty-buffer");
+    }
+
+    const ctx = getAudioContext();
+    console.log("[ariaSpeak] AudioContext state:", ctx.state);
+
+    if (ctx.state === "suspended") {
+      console.warn("[ariaSpeak] AudioContext suspended — calling resume()");
+      try {
+        await ctx.resume();
+        console.log("[ariaSpeak] AudioContext resumed:", ctx.state);
+      } catch {
+        console.warn("[ariaSpeak] resume() failed — signalling blocked");
+        onBlocked?.();
+        throw new Error("context-suspended");
+      }
+    }
+
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    console.log("[ariaSpeak] Decoded audio duration:", audioBuffer.duration.toFixed(2), "s");
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    source.start(0);
+    console.log("[ariaSpeak] Playing via Web Audio API");
+
+    await new Promise<void>((resolve) => {
+      source.onended = () => { console.log("[ariaSpeak] Web Audio playback ended"); resolve(); };
+      // Safety timeout
+      setTimeout(resolve, (audioBuffer.duration + 2) * 1000);
+    });
+
+    return; // Success — skip browser fallback
   } catch (err) {
-    console.error("[ariaSpeak] Fetch/play error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg !== "no-audio" && msg !== "empty-buffer" && msg !== "context-suspended") {
+      console.error("[ariaSpeak] Web Audio error:", err);
+    }
   }
 
-  if (!usedElevenLabs) {
-    console.log("[ariaSpeak] Falling back to browser speech synthesis");
-    await speakWithBrowser(text, lang);
-  }
+  // Fallback to browser speech synthesis
+  console.log("[ariaSpeak] Falling back to browser TTS");
+  await speakWithBrowser(text, lang);
 }
 
 // ─── ICP Fit Score Badge ────────────────────────────────────────────────────
@@ -463,7 +486,6 @@ function getCurrentMessage(
 
 export default function ARIAOnboardingPage() {
   const router = useRouter();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // lang starts as "en" for SSR/hydration consistency.
   const [lang, setLang] = useState<"ar" | "en">("en");
@@ -491,23 +513,10 @@ export default function ARIAOnboardingPage() {
 
   const t = T[lang];
 
-  // ── Unlock audio element synchronously during a user gesture ─────────────
-  // Browsers require a user gesture to allow audio playback. We call .play()
-  // immediately inside the gesture handler (before any await) to "activate"
-  // the element, so the subsequent async .play() call succeeds.
-  function unlockAudio() {
-    const el = audioRef.current;
-    if (!el) return;
-    el.muted = true;
-    el.play()
-      .then(() => { el.pause(); el.muted = false; })
-      .catch(() => { el.muted = false; });
-  }
-
   // ── Language toggle ───────────────────────────────────────────────────────
-  function handleLangToggle() {
-    // Unlock audio synchronously while still inside the user gesture handler
-    unlockAudio();
+  const handleLangToggle = useCallback(() => {
+    // Resume AudioContext synchronously inside the user gesture
+    resumeAudioContext();
     setAudioBlocked(false);
 
     const newLang = lang === "ar" ? "en" : "ar";
@@ -524,23 +533,34 @@ export default function ARIAOnboardingPage() {
     if (msg) {
       pendingSpeakRef.current = { text: msg, lang: newLang };
       setAriaState("speaking");
-      ariaSpeak(msg, newLang, audioRef.current, () => setAudioBlocked(true)).then(() => {
+      ariaSpeak(msg, newLang, () => setAudioBlocked(true)).then(() => {
         setAriaState(phaseRef.current === "url-input" ? "listening" : "idle");
       });
     }
-  }
+  }, [lang]);
 
-  // ── "Tap to hear" replay — used when autoplay was blocked ─────────────────
-  function handleTapToHear() {
-    unlockAudio();
+  // ── "Tap to hear" replay ──────────────────────────────────────────────────
+  const handleTapToHear = useCallback(() => {
+    resumeAudioContext();
     setAudioBlocked(false);
     const pending = pendingSpeakRef.current;
     if (!pending) return;
     setAriaState("speaking");
-    ariaSpeak(pending.text, pending.lang, audioRef.current, () => setAudioBlocked(true)).then(() => {
+    ariaSpeak(pending.text, pending.lang, () => setAudioBlocked(true)).then(() => {
       setAriaState(phaseRef.current === "url-input" ? "listening" : "idle");
     });
-  }
+  }, []);
+
+  // ── Unlock AudioContext on first user interaction ─────────────────────────
+  useEffect(() => {
+    const unlock = () => resumeAudioContext();
+    document.addEventListener("click", unlock, { once: true });
+    document.addEventListener("touchstart", unlock, { once: true });
+    return () => {
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("touchstart", unlock);
+    };
+  }, []);
 
   // ── Single initialization effect ──────────────────────────────────────────
   useEffect(() => {
@@ -571,7 +591,7 @@ export default function ARIAOnboardingPage() {
         setAriaState("speaking");
         pendingSpeakRef.current = { text: msg, lang: detectedLang };
 
-        await ariaSpeak(msg, detectedLang, audioRef.current, () => setAudioBlocked(true));
+        await ariaSpeak(msg, detectedLang, () => setAudioBlocked(true));
 
         setPhase("url-input");
         setAriaState("listening");
@@ -591,7 +611,7 @@ export default function ARIAOnboardingPage() {
     setAriaMessage(t.analyzing);
     setAriaState("thinking");
     pendingSpeakRef.current = { text: t.analyzing, lang };
-    await ariaSpeak(t.analyzing, lang, audioRef.current, () => setAudioBlocked(true));
+    await ariaSpeak(t.analyzing, lang, () => setAudioBlocked(true));
 
     try {
       const res = await fetch("/api/aria/analyze-website", {
@@ -611,7 +631,7 @@ export default function ARIAOnboardingPage() {
       setAriaMessage(confirmMsg);
       setPhase("confirm-analysis");
       pendingSpeakRef.current = { text: confirmMsg, lang };
-      await ariaSpeak(confirmMsg, lang, audioRef.current, () => setAudioBlocked(true));
+      await ariaSpeak(confirmMsg, lang, () => setAudioBlocked(true));
       setAriaState("idle");
     } catch {
       setUrlError(t.unreachable);
@@ -626,7 +646,7 @@ export default function ARIAOnboardingPage() {
     setAriaMessage(t.giftAnnounce);
     setAriaState("thinking");
     pendingSpeakRef.current = { text: t.giftAnnounce, lang };
-    await ariaSpeak(t.giftAnnounce, lang, audioRef.current, () => setAudioBlocked(true));
+    await ariaSpeak(t.giftAnnounce, lang, () => setAudioBlocked(true));
 
     try {
       const res = await fetch("/api/aria/generate-free-leads", {
@@ -662,7 +682,6 @@ export default function ARIAOnboardingPage() {
       dir={t.dir}
       style={{ fontFamily: lang === "ar" ? "'Cairo', sans-serif" : "inherit" }}
     >
-      <audio ref={audioRef} className="hidden" />
 
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-teal-900/40">
