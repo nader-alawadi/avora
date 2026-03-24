@@ -71,7 +71,7 @@ export async function GET() {
 
     // Enrich each active member with performance + attendance data
     const employees = await Promise.all(
-      activeMembers.map(async (member: any) => {
+      activeMembers.map(async (member) => {
         const [thisMonthLeads, allTimeLeads, approvedWithdrawals, attendanceLogs] =
           await Promise.all([
             // This month delivered leads (excl. Staged)
@@ -84,7 +84,7 @@ export async function GET() {
               select: { status: true },
             }),
 
-           (l: any)
+            // All-time delivered leads (excl. Staged)
             prisma.deliveredLead.findMany({
               where: {
                 deliveredByAdminId: member.id,
@@ -110,8 +110,9 @@ export async function GET() {
           ]);
 
         // thisMonth stats
-const thisMonthQualified = thisMonthLeads.filter((l: any) => l.status !== "Disputed").length;
-const thisMonthRejected = thisMonthLeads.filter((l: any) => l.status === "Disputed").length;
+        const thisMonthQualified = thisMonthLeads.filter((l) => l.status !== "Disputed").length;
+        const thisMonthRejected = thisMonthLeads.filter((l) => l.status === "Disputed").length;
+        const thisMonthTotal = thisMonthLeads.length;
 
         // allTime stats
         const allTimeQualified = allTimeLeads.filter((l) => l.status !== "Disputed").length;

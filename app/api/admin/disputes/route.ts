@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (action === "accept") {
-      await prisma.$transaction(async (tx: any) => {
+      await prisma.$transaction(async (tx) => {
         // 1. Mark the DeliveredLead as "Disputed" and stamp the dispute data onto it
         //    so Lead Researchers can see exactly why it was rejected.
         //    Do this BEFORE deleting the CrmLead (which would null out crmLead.deliveredLeadId).
