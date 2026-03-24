@@ -360,7 +360,8 @@ const CheckIcon = () => (
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function RegisterPage() {
   const router = useRouter();
-  const direction = useRef(1);
+  const directionRef = useRef(1);
+  const [directionVal, setDirectionVal] = useState(1);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -379,11 +380,9 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [isRTL, setIsRTL] = useState(false);
-
-  useEffect(() => {
-    setIsRTL(navigator.language.startsWith("ar"));
-  }, []);
+  const [isRTL] = useState(() =>
+    typeof navigator !== "undefined" ? navigator.language.startsWith("ar") : false
+  );
 
   // ─── Derived ─────────────────────────────────────────────────────────────────
   const ariaMood =
@@ -530,13 +529,15 @@ export default function RegisterPage() {
       return;
     }
 
-    direction.current = 1;
+    directionRef.current = 1;
+    setDirectionVal(1);
     setCurrentStep((s) => s + 1);
   };
 
   const handleBack = () => {
     if (currentStep === 1) return;
-    direction.current = -1;
+    directionRef.current = -1;
+    setDirectionVal(-1);
     setErrors({});
     setCurrentStep((s) => s - 1);
   };
@@ -1052,10 +1053,10 @@ export default function RegisterPage() {
             </AnimatePresence>
 
             {/* Step form content */}
-            <AnimatePresence mode="wait" custom={direction.current}>
+            <AnimatePresence mode="wait" custom={directionVal}>
               <motion.div
                 key={currentStep}
-                custom={direction.current}
+                custom={directionVal}
                 variants={slideVariants}
                 initial="enter"
                 animate="center"

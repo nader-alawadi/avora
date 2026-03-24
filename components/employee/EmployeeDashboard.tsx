@@ -141,10 +141,8 @@ export function EmployeeDashboard({ memberName, memberRole }: { memberName: stri
   }, []);
 
   useEffect(() => {
-    loadAttendance();
-    loadPerformance();
-    loadProfile();
-    loadWithdrawals();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetchers set state after await, not synchronously
+    loadAttendance(); loadPerformance(); loadProfile(); loadWithdrawals();
   }, [loadAttendance, loadPerformance, loadProfile, loadWithdrawals]);
 
   // ── Actions ────────────────────────────────────────────────────────────

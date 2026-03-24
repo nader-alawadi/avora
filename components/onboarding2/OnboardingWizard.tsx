@@ -446,14 +446,17 @@ function Confetti() {
     "#34d399",
     "#f472b6",
   ];
-  const pieces = Array.from({ length: 70 }, (_, i) => ({
-    id: i,
-    color: colors[i % colors.length],
-    x: Math.random() * 100,
-    delay: Math.random() * 0.8,
-    size: 7 + Math.random() * 9,
-    rotation: Math.random() * 360,
-  }));
+  const [pieces] = useState(() =>
+    Array.from({ length: 70 }, (_, i) => ({
+      id: i,
+      color: colors[i % colors.length],
+      x: Math.random() * 100,
+      delay: Math.random() * 0.8,
+      size: 7 + Math.random() * 9,
+      rotation: Math.random() * 360,
+      duration: 2.5 + Math.random() * 1.5,
+    }))
+  );
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
@@ -467,7 +470,7 @@ function Confetti() {
             opacity: [1, 1, 0.8, 0],
           }}
           transition={{
-            duration: 2.5 + Math.random() * 1.5,
+            duration: p.duration,
             delay: p.delay,
             ease: "easeIn",
           }}

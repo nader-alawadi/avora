@@ -140,7 +140,7 @@ export function OnboardingStep6({ answers, onSave }: StepProps) {
       />
 
       <Button onClick={handleSave} loading={saving} variant="secondary" className="w-full">
-        Save — I'm Ready to Generate 🚀
+        Save — I&apos;m Ready to Generate 🚀
       </Button>
     </div>
   );

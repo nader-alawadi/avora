@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   );
 
   try {
-    let upstream = await callStream(text, primaryVoice);
+    const upstream = await callStream(text, primaryVoice);
     console.log(`[speak] ElevenLabs /stream response: ${upstream.status}`);
 
     if (!upstream.ok) {
