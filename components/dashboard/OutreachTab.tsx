@@ -197,7 +197,7 @@ function ColdCallScriptView({ script }: { script: ColdCallScript }) {
           {(script.objectionLoops || []).map((loop, i) => (
             <div key={i} className="bg-white border border-orange-200 rounded-lg p-3">
               <p className="text-xs font-bold text-orange-600 mb-1">Objection {i + 1}:</p>
-              <p className="text-sm text-gray-600 font-mono italic mb-2">"{loop.objection}"</p>
+              <p className="text-sm text-gray-600 font-mono italic mb-2">&ldquo;{loop.objection}&rdquo;</p>
               <p className="text-xs font-bold text-green-600 mb-1">Reframe:</p>
               <p className="text-sm text-gray-700 font-mono leading-relaxed">{loop.reframe}</p>
             </div>

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { EmployeeDashboard } from "@/components/employee/EmployeeDashboard";
 import Link from "next/link";
@@ -75,7 +75,7 @@ const TABS_BY_TEAM_ROLE: Record<string, string[]> = {
   Viewer:  ["icp", "dmu", "abm", "outreach", "lookalike", "crm"],
 };
 
-export default function DashboardPage() {
+function DashboardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
@@ -170,8 +170,8 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
+      <div className="min-h-screen bg-[#F8FAFC]">
+        <header className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-16">
             <AvoraLogo size={32} />
           </div>
@@ -189,30 +189,34 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F8FAFC]">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <AvoraLogo size={32} />
-              <Badge variant={user?.plan === "PLUS" ? "success" : "default"}>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${
+                user?.plan === "PLUS"
+                  ? "bg-[#DBEAFE] text-[#2563EB]"
+                  : "bg-gray-100 text-gray-500"
+              }`}>
                 {user?.plan || "LITE"}
-              </Badge>
+              </span>
               {user?.sessionType === "teamMember" && (
                 <Badge variant="info">{user.teamRole}</Badge>
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              <Link href="/contact" className="text-sm text-gray-500 hover:text-[#1E6663]">Contact Us</Link>
+            <div className="flex items-center gap-4">
+              <Link href="/contact" className="text-sm text-gray-500 hover:text-[#2563EB] transition-colors font-medium">Contact Us</Link>
               {isOwner && (
-                <Link href="/onboarding" className="text-sm text-gray-500 hover:text-[#1E6663]">Edit Onboarding</Link>
+                <Link href="/onboarding" className="text-sm text-gray-500 hover:text-[#2563EB] transition-colors font-medium">Edit Onboarding</Link>
               )}
               {user?.isAdmin && (
-                <Link href="/admin" className="text-sm text-gray-500 hover:text-[#1E6663]">Admin</Link>
+                <Link href="/admin" className="text-sm text-gray-500 hover:text-[#2563EB] transition-colors font-medium">Admin</Link>
               )}
-              <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-500">Sign Out</button>
+              <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-500 transition-colors font-medium">Sign Out</button>
             </div>
           </div>
         </div>
@@ -221,9 +225,9 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* TeamMember banner */}
         {user?.sessionType === "teamMember" && (
-          <div className="bg-[#1E6663]/8 border border-[#1E6663]/20 rounded-xl p-3 mb-6 flex items-center gap-3">
-            <span className="text-[#1E6663] text-lg">🤝</span>
-            <p className="text-sm text-[#1E6663]">
+          <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl p-3 mb-6 flex items-center gap-3">
+            <span className="text-[#2563EB] text-lg">🤝</span>
+            <p className="text-sm text-[#1D4ED8]">
               You&apos;re viewing as a <strong>{user.teamRole}</strong> workspace member.
               {user.teamRole === "Viewer" && " You have read-only access."}
               {user.teamRole === "SalesRep" && " You have access to the CRM pipeline."}
@@ -236,7 +240,7 @@ export default function DashboardPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-2xl font-bold text-[#1F2A2A]">
+                <h1 className="text-2xl font-bold text-[#1E293B]">
                   Welcome back{user?.name ? `, ${user.name}` : ""}
                 </h1>
                 <p className="text-gray-500 text-sm mt-1">
@@ -273,12 +277,12 @@ export default function DashboardPage() {
                 className="grid grid-cols-2 lg:grid-cols-4 gap-4"
               >
                 {[
-                  <div key="icp" className="bg-white rounded-xl border border-gray-100 p-4 card-hover">
-                    <p className="text-xs text-gray-500 mb-1">ICP Confidence</p>
+                  <div key="icp" className="bg-white rounded-2xl border border-gray-100 p-5 card-hover shadow-sm">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">ICP Confidence</p>
                     <ConfidenceMeter label="" value={report.icpConfidence} size="sm" />
                   </div>,
-                  <div key="dmu" className="bg-white rounded-xl border border-gray-100 p-4 card-hover">
-                    <p className="text-xs text-gray-500 mb-1">DMU Confidence</p>
+                  <div key="dmu" className="bg-white rounded-2xl border border-gray-100 p-5 card-hover shadow-sm">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">DMU Confidence</p>
                     <ConfidenceMeter label="" value={report.dmuConfidence} size="sm" />
                   </div>,
                   <KpiCard key="gate" title="Strict Gate"
@@ -345,7 +349,7 @@ export default function DashboardPage() {
                     onClick={() => setActiveTab(tab.id)}
                     className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === tab.id
-                        ? "border-[#1E6663] text-[#1E6663]"
+                        ? "border-[#2563EB] text-[#2563EB]"
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                     }`}
                   >
@@ -424,5 +428,13 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense>
+      <DashboardInner />
+    </Suspense>
   );
 }

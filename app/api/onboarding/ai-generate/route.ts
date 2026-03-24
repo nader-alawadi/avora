@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic();
+import { requireAnthropicClient } from "@/lib/anthropic-client";
 
 export async function POST(req: NextRequest) {
   try { await requireAuth(); } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let client;
+  try {
+    client = requireAnthropicClient();
+  } catch {
+    console.error("[ai-generate] ANTHROPIC_API_KEY is missing or is a placeholder");
+    return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
   }
 
   const { field, context, lang } = await req.json();
@@ -53,15 +59,24 @@ export async function POST(req: NextRequest) {
   const promptFn = fieldPrompts[field];
   if (!promptFn) return NextResponse.json({ error: "Unknown field" }, { status: 400 });
 
-  const userPrompt = promptFn(context || {});
+  try {
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      system: systemPrompt,
+      messages: [{ role: "user", content: promptFn(context || {}) }],
+    });
 
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 300,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
-  return NextResponse.json({ text });
+    const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
+    console.log(`[ai-generate] field=${field} text_len=${text.length}`);
+    return NextResponse.json({ text });
+  } catch (err: unknown) {
+    const status = (err as { status?: number })?.status;
+    if (status === 401 || status === 403) {
+      console.error("[ai-generate] Anthropic auth error — check ANTHROPIC_API_KEY");
+      return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
+    }
+    console.error("[ai-generate] Anthropic error:", err);
+    return NextResponse.json({ error: "AI generation failed" }, { status: 500 });
+  }
 }

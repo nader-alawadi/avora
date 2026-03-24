@@ -9,6 +9,13 @@ datasource db {
 model User {
   id              String    @id @default(cuid())
   name            String?
+  firstName       String?
+  lastName        String?
+  companyName     String?
+  companyWebsite  String?
+  phone           String?
+  phoneVerified   Boolean   @default(false)
+  emailVerified   Boolean   @default(false)
   email           String    @unique
   password        String
   plan            String    @default("LITE")
@@ -32,6 +39,7 @@ model User {
   crmLeads          CrmLead[]
   teamMembers       TeamMember[]
   leadDisputes      LeadDispute[]
+  ariaSession       AriaSession?
 
   @@map("users")
 }
@@ -211,10 +219,23 @@ model CrmLead {
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
 
+  icpFitScore            Int?
+  icpFitReason           String?
+  personalityAnalysis    String?
+  outreachRecommendation String?
+  bestChannel            String?
+  bestTime               String?
+  outreachTemplates      String?   // JSON: {linkedin, email, whatsapp, coldCall}
+  source                 String?   // e.g. "ARIA_FREE_GIFT"
+  companyWebsite         String?
+  employeeCount          String?
+  industry               String?
+
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveredLead DeliveredLead? @relation(fields: [deliveredLeadId], references: [id])
   activities    CrmActivity[]
   disputes      LeadDispute[]
+  feedback      LeadFeedback[]
 
   @@map("crm_leads")
 }
@@ -319,6 +340,46 @@ model LeadDispute {
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("lead_disputes")
+}
+
+model LeadFeedback {
+  id        String   @id @default(cuid())
+  leadId    String
+  userId    String
+  rating    String   // "good" | "bad"
+  reason    String?
+  createdAt DateTime @default(now())
+
+  crmLead CrmLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("lead_feedback")
+}
+
+model AriaSession {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  websiteUrl  String?
+  websiteData String?  // JSON: {companyName, industry, description, targetMarket}
+  currentTask Int      @default(0)
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("aria_sessions")
+}
+
+model OtpVerification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "email" | "phone"
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("otp_verifications")
 }
 
 model AttendanceLog {

@@ -1,0 +1,389 @@
+/**
+ * AVORA Component Library
+ * ───────────────────────
+ * Reusable UI component classes built on top of tokens.css.
+ * Requires tokens.css to be imported first.
+ *
+ * Usage:
+ *   @import './tokens.css';
+ *   @import './components.css';
+ */
+
+/* ── Base reset ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+
+/**
+ * .avora-btn-primary
+ * Coral fill, white text, pill shape.
+ * Use for primary CTAs.
+ */
+.avora-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--avora-coral);
+  color: var(--avora-white);
+  border-radius: var(--avora-radius-full);
+  font-family: var(--avora-font-family);
+  font-weight: var(--avora-font-weight-bold);
+  font-size: var(--avora-text-sm);
+  padding: 12px 28px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--avora-transition-fast),
+    box-shadow var(--avora-transition-fast),
+    transform var(--avora-transition-fast);
+  box-shadow: var(--avora-shadow-coral);
+}
+.avora-btn-primary:hover {
+  background: var(--avora-coral-dark);
+  box-shadow: 0 10px 32px rgba(255,82,82,0.45);
+  transform: translateY(-1px);
+}
+.avora-btn-primary:active {
+  transform: translateY(0);
+  box-shadow: var(--avora-shadow-coral);
+}
+.avora-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/**
+ * .avora-btn-secondary
+ * Teal outline, teal text, pill shape.
+ * Use for secondary actions on light backgrounds.
+ */
+.avora-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--avora-teal-dark);
+  border-radius: var(--avora-radius-full);
+  font-family: var(--avora-font-family);
+  font-weight: var(--avora-font-weight-bold);
+  font-size: var(--avora-text-sm);
+  padding: 11px 28px;
+  border: 2px solid var(--avora-teal-dark);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--avora-transition-fast),
+    color var(--avora-transition-fast),
+    transform var(--avora-transition-fast);
+}
+.avora-btn-secondary:hover {
+  background: var(--avora-teal-dark);
+  color: var(--avora-white);
+  transform: translateY(-1px);
+}
+.avora-btn-secondary:active { transform: translateY(0); }
+
+/**
+ * .avora-btn-ghost
+ * Transparent background, white text, pill shape.
+ * Use for secondary actions on dark/teal backgrounds.
+ */
+.avora-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: var(--avora-radius-full);
+  font-family: var(--avora-font-family);
+  font-weight: var(--avora-font-weight-bold);
+  font-size: var(--avora-text-sm);
+  padding: 11px 28px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--avora-transition-fast),
+    border-color var(--avora-transition-fast),
+    color var(--avora-transition-fast),
+    transform var(--avora-transition-fast);
+}
+.avora-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: var(--avora-white);
+  transform: translateY(-1px);
+}
+.avora-btn-ghost:active { transform: translateY(0); }
+
+/* ── Card ────────────────────────────────────────────────────── */
+
+/**
+ * .avora-card
+ * White background, 16px radius, teal top border accent.
+ */
+.avora-card {
+  background: var(--avora-white);
+  border-radius: var(--avora-radius-lg);
+  border-top: 3px solid var(--avora-teal-dark);
+  box-shadow: var(--avora-shadow-md);
+  padding: var(--avora-space-6);
+  transition: transform var(--avora-transition-normal), box-shadow var(--avora-transition-normal);
+}
+.avora-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--avora-shadow-lg);
+}
+
+/**
+ * .avora-card-flat
+ * Card without top border accent — for neutral content sections.
+ */
+.avora-card-flat {
+  background: var(--avora-white);
+  border-radius: var(--avora-radius-lg);
+  border: 1px solid var(--avora-border);
+  box-shadow: var(--avora-shadow-sm);
+  padding: var(--avora-space-6);
+  transition: transform var(--avora-transition-normal), box-shadow var(--avora-transition-normal);
+}
+.avora-card-flat:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--avora-shadow-md);
+}
+
+/* ── Badge ───────────────────────────────────────────────────── */
+
+/**
+ * .avora-badge
+ * Coral background, white text, pill shape.
+ */
+.avora-badge {
+  display: inline-block;
+  background: var(--avora-coral);
+  color: var(--avora-white);
+  border-radius: var(--avora-radius-full);
+  font-family: var(--avora-font-family);
+  font-size: 11px;
+  font-weight: var(--avora-font-weight-bold);
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  line-height: 1.6;
+}
+
+/**
+ * .avora-badge-teal
+ * Teal background, white text.
+ */
+.avora-badge-teal {
+  display: inline-block;
+  background: var(--avora-teal-dark);
+  color: var(--avora-white);
+  border-radius: var(--avora-radius-full);
+  font-family: var(--avora-font-family);
+  font-size: 11px;
+  font-weight: var(--avora-font-weight-bold);
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  line-height: 1.6;
+}
+
+/* ── Input ───────────────────────────────────────────────────── */
+
+/**
+ * .avora-input
+ * Teal border, rounded corners, coral focus ring.
+ */
+.avora-input {
+  width: 100%;
+  background: var(--avora-white);
+  border: 1.5px solid var(--avora-border-teal);
+  border-radius: var(--avora-radius-md);
+  color: var(--avora-text-primary);
+  font-family: var(--avora-font-family-body);
+  font-size: var(--avora-text-sm);
+  padding: 10px 14px;
+  line-height: 1.5;
+  transition:
+    border-color var(--avora-transition-fast),
+    box-shadow var(--avora-transition-fast);
+  outline: none;
+}
+.avora-input::placeholder { color: var(--avora-text-light); }
+.avora-input:focus {
+  border-color: var(--avora-coral);
+  box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.12);
+}
+.avora-input:disabled {
+  background: var(--avora-surface-teal);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* ── Tag ─────────────────────────────────────────────────────── */
+
+/**
+ * .avora-tag
+ * Light teal surface, teal text, small pill.
+ */
+.avora-tag {
+  display: inline-block;
+  background: var(--avora-surface-teal);
+  color: var(--avora-teal-dark);
+  border-radius: var(--avora-radius-full);
+  font-family: var(--avora-font-family);
+  font-size: 12px;
+  font-weight: var(--avora-font-weight-semibold);
+  padding: 4px 12px;
+  line-height: 1.5;
+}
+
+/* ── Section label ───────────────────────────────────────────── */
+
+/**
+ * .avora-label
+ * Small uppercase label used above section headings.
+ */
+.avora-label {
+  display: inline-block;
+  font-family: var(--avora-font-family);
+  font-size: 11px;
+  font-weight: var(--avora-font-weight-extrabold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--avora-coral);
+}
+
+/* ── Divider ─────────────────────────────────────────────────── */
+
+.avora-divider {
+  width: 48px;
+  height: 3px;
+  background: var(--avora-coral);
+  border-radius: var(--avora-radius-full);
+  margin: 12px auto;
+}
+
+/* ── Coral dot (decorative) ──────────────────────────────────── */
+
+/**
+ * .avora-dot
+ * The coral dot motif — use as bullet points, separators, step indicators.
+ */
+.avora-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--avora-coral);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.avora-dot-sm {
+  width: 6px;
+  height: 6px;
+}
+.avora-dot-lg {
+  width: 12px;
+  height: 12px;
+}
+.avora-dot-pulse {
+  animation: avora-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes avora-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ── Feature icon container ──────────────────────────────────── */
+
+/**
+ * .avora-icon-wrap
+ * Container for feature section icons.
+ */
+.avora-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--avora-radius-lg);
+  background: var(--avora-teal-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--avora-white);
+  flex-shrink: 0;
+  transition: transform var(--avora-transition-normal);
+}
+.avora-icon-wrap-coral {
+  background: var(--avora-coral);
+}
+.avora-icon-wrap:hover { transform: scale(1.08); }
+
+/* ── Nav bar ─────────────────────────────────────────────────── */
+
+.avora-nav {
+  background: var(--avora-teal-bg);
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.avora-nav-link {
+  color: rgba(255, 255, 255, 0.75);
+  font-family: var(--avora-font-family-body);
+  font-size: var(--avora-text-sm);
+  font-weight: var(--avora-font-weight-medium);
+  text-decoration: none;
+  position: relative;
+  transition: color var(--avora-transition-fast);
+}
+.avora-nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--avora-coral);
+  border-radius: var(--avora-radius-full);
+  transition: width var(--avora-transition-normal);
+}
+.avora-nav-link:hover { color: var(--avora-white); }
+.avora-nav-link:hover::after { width: 100%; }
+
+/* ── Glassmorphism ───────────────────────────────────────────── */
+
+.avora-glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+
+.avora-scrollbar::-webkit-scrollbar { width: 6px; }
+.avora-scrollbar::-webkit-scrollbar-track { background: var(--avora-surface-teal); }
+.avora-scrollbar::-webkit-scrollbar-thumb { background: var(--avora-border-teal); border-radius: 3px; }
+.avora-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--avora-teal-medium); }
+
+/* ── Shimmer skeleton ────────────────────────────────────────── */
+
+@keyframes avora-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.avora-skeleton {
+  background: linear-gradient(90deg, var(--avora-surface-teal) 25%, #D5ECEC 50%, var(--avora-surface-teal) 75%);
+  background-size: 600px 100%;
+  animation: avora-shimmer 1.4s infinite linear;
+  border-radius: var(--avora-radius-sm);
+}

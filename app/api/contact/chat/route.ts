@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
+import { requireAnthropicClient } from "@/lib/anthropic-client";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = requireAnthropicClient();
 
 const BASE_SYSTEM_PROMPT = `You are **Aria** — a GTM consultant at AVORA by Enigma Sales. You're sharp, direct, and genuinely helpful. Think of yourself as a smart friend who happens to be an expert in B2B sales strategy.
 
