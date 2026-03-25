@@ -143,7 +143,8 @@ export default function ConversationalOnboarding() {
 
   const toggleMulti = useCallback((key: string, value: string) => {
     setAnswers(prev => {
-      const current = prev[key] ? JSON.parse(prev[key]) as string[] : [];
+      let current: string[] = [];
+      if (prev[key]) { try { current = JSON.parse(prev[key]) as string[]; } catch { current = []; } }
       const next = current.includes(value)
         ? current.filter(v => v !== value)
         : [...current, value];
