@@ -2,8 +2,12 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import bcrypt from "bcryptjs";
 
+const url = process.env.DATABASE_URL || "file:./prisma/dev.db";
 const adapter = new PrismaLibSql({
-  url: process.env.DATABASE_URL || "file:./prisma/dev.db",
+  url,
+  ...(url.startsWith("libsql://") && process.env.TURSO_AUTH_TOKEN
+    ? { authToken: process.env.TURSO_AUTH_TOKEN }
+    : {}),
 });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const prisma = new PrismaClient({ adapter } as any);
