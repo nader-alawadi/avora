@@ -67,6 +67,10 @@ export default function ConversationalOnboarding() {
   const [inviteErrors, setInviteErrors] = useState<[string, string]>(["", ""]);
   const [inviteStatus, setInviteStatus] = useState("");
 
+  // Prevent hydration mismatch: skip enter animation on first render
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => { setHasMounted(true); }, []);
+
   const isRTL = lang === "ar";
   const step = STEPS[currentStep];
   const totalSteps = STEPS.length;
@@ -915,7 +919,7 @@ export default function ConversationalOnboarding() {
               key={currentStep}
               custom={direction}
               variants={slideVariants}
-              initial="enter"
+              initial={hasMounted ? "enter" : false}
               animate="center"
               exit="exit"
               transition={TRANSITION}
