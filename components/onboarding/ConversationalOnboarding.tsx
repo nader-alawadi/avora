@@ -66,6 +66,16 @@ const qTitle = (q: Question, lang: Lang) => lang === "ar" ? q.titleAr : q.title;
 const qSubtitle = (q: Question, lang: Lang) => lang === "ar" ? q.subtitleAr : q.subtitle;
 const optLabel = (o: ChoiceOption, lang: Lang) => lang === "ar" ? o.labelAr : o.label;
 
+/** Safely parse JSON from a fetch response; returns null on failure */
+async function safeJSON<T = unknown>(res: Response): Promise<T | null> {
+  try {
+    const text = await res.text();
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 // ═════════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════════
@@ -111,12 +121,11 @@ export default function ConversationalOnboarding() {
       try {
         const res = await fetch("/api/onboarding/answers");
         if (!res.ok) return;
-        const data = await res.json();
+        const data = await safeJSON<{ answers?: Record<string, Record<string, string>> }>(res);
+        if (!data?.answers) return;
         const flat: Record<string, string> = {};
-        if (data.answers) {
-          for (const stepAnswers of Object.values(data.answers) as Record<string, string>[]) {
-            for (const [k, v] of Object.entries(stepAnswers)) flat[k] = v;
-          }
+        for (const stepAnswers of Object.values(data.answers)) {
+          for (const [k, v] of Object.entries(stepAnswers)) flat[k] = v;
         }
         if (Object.keys(flat).length > 0) setAnswers(flat);
         if (flat.language === "العربية") setLang("ar");
@@ -226,9 +235,8 @@ export default function ConversationalOnboarding() {
         }),
       });
       if (res.ok) {
-        const data = await res.json();
-        if (data.suggestion) {
-          // For multi_choice, pre-select the suggested values
+        const data = await safeJSON<{ suggestion?: string | string[] }>(res);
+        if (data?.suggestion) {
           if (question.type === "multi_choice" && Array.isArray(data.suggestion)) {
             setAnswer(question.key, JSON.stringify(data.suggestion));
           } else if (typeof data.suggestion === "string") {
@@ -236,7 +244,7 @@ export default function ConversationalOnboarding() {
           }
         }
       }
-    } catch { /* ignore */ }
+    } catch { /* network error — ignore */ }
     setAiLoading(false);
   }, [question, answers, lang, setAnswer]);
 
@@ -261,8 +269,8 @@ export default function ConversationalOnboarding() {
         try {
           const res = await fetch("/api/onboarding/transcribe", { method: "POST", body: formData });
           if (res.ok) {
-            const data = await res.json();
-            if (data.text) {
+            const data = await safeJSON<{ text?: string }>(res);
+            if (data?.text) {
               const key = question.key;
               setAnswer(key, (answers[key] || "") + " " + data.text);
             }
@@ -297,8 +305,8 @@ export default function ConversationalOnboarding() {
           body: JSON.stringify({ email: inv.email, role: inv.role }),
         });
         if (!res.ok) {
-          const data = await res.json();
-          errors[i as 0 | 1] = data.error || "Failed";
+          const data = await safeJSON<{ error?: string }>(res);
+          errors[i as 0 | 1] = data?.error || "Failed";
         } else {
           sent = true;
         }

@@ -219,7 +219,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
   }
 
-  const body = await req.json();
+  let body: { questionKey?: string; websiteUrl?: string; previousAnswers?: Record<string, string>; lang?: string; field?: string; context?: Record<string, string> };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
   // New API: { questionKey, websiteUrl, previousAnswers, lang }
   if (body.questionKey) {
@@ -242,15 +247,21 @@ export async function POST(req: NextRequest) {
       const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
       console.log(`[ai-generate] questionKey=${questionKey} text="${text}"`);
 
+      // Strip markdown formatting, backticks, and other noise Claude may add
+      const clean = text.replace(/```[\s\S]*?```/g, "").replace(/[`#*]/g, "").trim();
+
       let suggestion: string | string[];
       if (isArray) {
         try {
-          suggestion = JSON.parse(text) as string[];
+          // Try to extract JSON array from the response
+          const jsonMatch = clean.match(/\[[\s\S]*?\]/);
+          suggestion = JSON.parse(jsonMatch ? jsonMatch[0] : clean) as string[];
         } catch {
-          suggestion = text.replace(/[\[\]"]/g, "").split(",").map(s => s.trim()).filter(Boolean);
+          suggestion = clean.replace(/[\[\]"]/g, "").split(",").map(s => s.trim()).filter(Boolean);
         }
       } else {
-        suggestion = text.replace(/["\s]/g, "").toLowerCase();
+        // Single value: strip everything except alphanumeric, underscores, hyphens, plus
+        suggestion = clean.replace(/[^a-zA-Z0-9_\-+]/g, "").toLowerCase();
       }
 
       return NextResponse.json({ suggestion });
@@ -267,7 +278,7 @@ export async function POST(req: NextRequest) {
   // Legacy API: { field, context, lang }
   const { field, context, lang } = body;
   const isAr = lang === "ar";
-  const promptFn = LEGACY_FIELDS[field];
+  const promptFn = field ? LEGACY_FIELDS[field] : undefined;
   if (!promptFn) return NextResponse.json({ error: "Unknown field" }, { status: 400 });
 
   try {
