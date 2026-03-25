@@ -1,81 +1,110 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type JSX } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AvoraLogo } from "@/components/ui/AvoraLogo";
 import {
-  STEPS, UI, TEAM_ROLES, TEAM_PERMISSIONS,
-  type Lang, type Bi, type QuestionConfig, type StepConfig,
+  QUESTIONS, OVERLAY_AFTER, OVERLAY_MESSAGES,
+  type Question, type ChoiceOption,
 } from "./onboarding-steps";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
-const t = (bi: Bi, lang: Lang) => bi[lang];
-const ui = (key: string, lang: Lang, vars?: Record<string, string>) => {
-  let s = UI[key]?.[lang] ?? key;
-  if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
-  return s;
+type Lang = "en" | "ar";
+
+interface TeamInvite {
+  email: string;
+  role: string;
+}
+
+const EMPTY_INVITE: TeamInvite = { email: "", role: "SalesRep" };
+const TEAM_ROLES = [
+  { value: "Admin", en: "Admin", ar: "مدير" },
+  { value: "SalesRep", en: "Sales Rep", ar: "مندوب مبيعات" },
+  { value: "Viewer", en: "Viewer", ar: "مشاهد" },
+];
+
+// ── UI strings ─────────────────────────────────────────────────────────────────
+
+const UI: Record<string, Record<Lang, string>> = {
+  next: { en: "Continue", ar: "التالي" },
+  back: { en: "Back", ar: "رجوع" },
+  skip: { en: "Skip", ar: "تخطي" },
+  saving: { en: "Saving…", ar: "جارٍ الحفظ…" },
+  yes: { en: "YES", ar: "نعم" },
+  no: { en: "NO", ar: "لا" },
+  aiSuggest: { en: "✨ AI Suggest", ar: "✨ اقتراح AI" },
+  aiGenerating: { en: "Generating…", ar: "جارٍ التوليد…" },
+  recording: { en: "Recording…", ar: "جارٍ التسجيل…" },
+  sendInvites: { en: "Send Invites", ar: "إرسال الدعوات" },
+  confirmGenerate: { en: "Generate My GTM Strategy", ar: "إنشاء استراتيجية GTM" },
+  editSection: { en: "Edit", ar: "تعديل" },
+  noAnswers: { en: "No answers yet", ar: "لا إجابات بعد" },
+  firstName: { en: "First Name", ar: "الاسم الأول" },
+  lastName: { en: "Last Name", ar: "اسم العائلة" },
+  companyName: { en: "Company Name", ar: "اسم الشركة" },
+  businessEmail: { en: "Business Email", ar: "البريد الإلكتروني" },
+  websiteUrl: { en: "Website URL", ar: "رابط الموقع" },
+  language: { en: "Language", ar: "اللغة" },
 };
+
+const ui = (key: string, lang: Lang) => UI[key]?.[lang] ?? key;
+
+// ── Animation ──────────────────────────────────────────────────────────────────
 
 const slideVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? 300 : -300, opacity: 0 }),
   center: { x: 0, opacity: 1 },
   exit: (dir: number) => ({ x: dir > 0 ? -300 : 300, opacity: 0 }),
 };
-
 const TRANSITION = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
 
-// ── Team Invite Type ─────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-interface TeamInvite {
-  firstName: string;
-  lastName: string;
-  jobTitle: string;
-  email: string;
-  role: string;
-  permissions: string[];
-}
+const qTitle = (q: Question, lang: Lang) => lang === "ar" ? q.titleAr : q.title;
+const qSubtitle = (q: Question, lang: Lang) => lang === "ar" ? q.subtitleAr : q.subtitle;
+const optLabel = (o: ChoiceOption, lang: Lang) => lang === "ar" ? o.labelAr : o.label;
 
-const EMPTY_INVITE: TeamInvite = {
-  firstName: "", lastName: "", jobTitle: "", email: "",
-  role: "Sales Rep", permissions: ["View leads", "View dashboards"],
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════════
 
 export default function ConversationalOnboarding() {
   const router = useRouter();
   const [lang, setLang] = useState<Lang>("en");
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentQ, setCurrentQ] = useState(0);
   const [direction, setDirection] = useState(1);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const [aiLoading, setAiLoading] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   // Voice
   const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Team invites
   const [invites, setInvites] = useState<[TeamInvite, TeamInvite]>([
     { ...EMPTY_INVITE }, { ...EMPTY_INVITE },
   ]);
   const [inviteErrors, setInviteErrors] = useState<[string, string]>(["", ""]);
-  const [inviteStatus, setInviteStatus] = useState("");
 
-  // Prevent hydration mismatch: skip enter animation on first render
+  // Overlay
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [overlayIdx, setOverlayIdx] = useState(0);
+
+  // Hydration fix
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => { setHasMounted(true); }, []);
 
   const isRTL = lang === "ar";
-  const step = STEPS[currentStep];
-  const totalSteps = STEPS.length;
+  const question = QUESTIONS[currentQ];
+  const totalQ = QUESTIONS.length;
 
-  // ── Load existing answers on mount ─────────────────────────────────────────
+  // ── Load existing answers on mount ──────────────────────────────────────────
 
   useEffect(() => {
     void (async () => {
@@ -95,7 +124,7 @@ export default function ConversationalOnboarding() {
     })();
   }, []);
 
-  // ── Answer helpers ─────────────────────────────────────────────────────────
+  // ── Answer helpers ──────────────────────────────────────────────────────────
 
   const setAnswer = useCallback((key: string, value: string) => {
     setAnswers(prev => ({ ...prev, [key]: value }));
@@ -118,192 +147,174 @@ export default function ConversationalOnboarding() {
     catch { return []; }
   }, [answers]);
 
-  // ── Save step answers ──────────────────────────────────────────────────────
+  // ── Save current question's answer ──────────────────────────────────────────
 
-  const saveStep = useCallback(async (stepConfig: StepConfig) => {
+  const saveQuestion = useCallback(async (q: Question) => {
     setSaving(true);
     const stepAnswers: Record<string, string> = {};
-    for (const q of stepConfig.questions) {
-      if (answers[q.key]) stepAnswers[q.key] = answers[q.key];
-    }
-    // Also save detail fields for multi-select-detail
-    for (const key of Object.keys(answers)) {
-      if (key.endsWith("_detail") && !stepAnswers[key]) {
-        const baseKey = key.replace("_detail", "");
-        if (stepConfig.questions.some(q => q.key === baseKey)) {
-          stepAnswers[key] = answers[key];
-        }
-      }
-    }
-    // Step 0 special fields
-    if (stepConfig.id === 0) {
-      for (const k of ["firstName", "lastName", "companyName", "businessEmail", "websiteUrl", "language", "autoFill"]) {
+
+    if (q.type === "welcome_form") {
+      for (const k of ["firstName", "lastName", "companyName", "businessEmail", "websiteUrl", "language"]) {
         if (answers[k]) stepAnswers[k] = answers[k];
       }
+    } else if (q.key.startsWith("_")) {
+      // special steps (team_invite, review) - skip
+    } else {
+      if (answers[q.key]) stepAnswers[q.key] = answers[q.key];
     }
-    try {
-      await fetch("/api/onboarding/answers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: stepConfig.id, answers: stepAnswers }),
-      });
-    } catch { /* ignore */ }
+
+    if (Object.keys(stepAnswers).length > 0) {
+      try {
+        await fetch("/api/onboarding/answers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ step: q.apiStep, answers: stepAnswers }),
+        });
+      } catch { /* ignore */ }
+    }
     setSaving(false);
   }, [answers]);
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
+  // ── Navigation ──────────────────────────────────────────────────────────────
 
   const goNext = useCallback(async () => {
-    await saveStep(step);
-    if (currentStep < totalSteps - 1) {
-      setDirection(1);
-      setCurrentStep(prev => prev + 1);
+    await saveQuestion(question);
+    if (currentQ < totalQ - 1) {
+      // Check for motivational overlay
+      if (OVERLAY_AFTER.has(question.id)) {
+        const idx = [...OVERLAY_AFTER].indexOf(question.id);
+        setOverlayIdx(idx);
+        setShowOverlay(true);
+        setTimeout(() => {
+          setShowOverlay(false);
+          setDirection(1);
+          setCurrentQ(prev => prev + 1);
+        }, 2000);
+      } else {
+        setDirection(1);
+        setCurrentQ(prev => prev + 1);
+      }
     }
-  }, [currentStep, totalSteps, step, saveStep]);
+  }, [currentQ, totalQ, question, saveQuestion]);
 
   const goBack = useCallback(() => {
-    if (currentStep > 0) {
+    if (currentQ > 0) {
       setDirection(-1);
-      setCurrentStep(prev => prev - 1);
+      setCurrentQ(prev => prev - 1);
     }
-  }, [currentStep]);
+  }, [currentQ]);
 
-  const goToStep = useCallback((idx: number) => {
-    setDirection(idx > currentStep ? 1 : -1);
-    setCurrentStep(idx);
-  }, [currentStep]);
+  const goToQuestion = useCallback((idx: number) => {
+    setDirection(idx > currentQ ? 1 : -1);
+    setCurrentQ(idx);
+  }, [currentQ]);
 
-  // ── AI Suggest ─────────────────────────────────────────────────────────────
+  // ── AI Suggest ──────────────────────────────────────────────────────────────
 
-  const handleAISuggest = useCallback(async (q: QuestionConfig) => {
-    if (!q.ai) return;
-    setAiLoading(q.key);
+  const handleAISuggest = useCallback(async () => {
+    if (question.type === "welcome_form" || question.type === "team_invite" || question.type === "review") return;
+    setAiLoading(true);
     try {
       const res = await fetch("/api/onboarding/ai-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ field: q.ai, context: answers, lang }),
+        body: JSON.stringify({
+          questionKey: question.key,
+          websiteUrl: answers.websiteUrl || "",
+          previousAnswers: answers,
+          lang,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.text) setAnswer(q.key, data.text);
+        if (data.suggestion) {
+          // For multi_choice, pre-select the suggested values
+          if (question.type === "multi_choice" && Array.isArray(data.suggestion)) {
+            setAnswer(question.key, JSON.stringify(data.suggestion));
+          } else if (typeof data.suggestion === "string") {
+            setAnswer(question.key, data.suggestion);
+          }
+        }
       }
     } catch { /* ignore */ }
-    setAiLoading(null);
-  }, [answers, lang, setAnswer]);
+    setAiLoading(false);
+  }, [question, answers, lang, setAnswer]);
 
-  // ── Voice Recording ────────────────────────────────────────────────────────
+  // ── Voice Recording ─────────────────────────────────────────────────────────
 
-  const startVoice = useCallback(async (key: string) => {
+  const startVoice = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
       chunksRef.current = [];
+      setRecordingTime(0);
+      timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
+        if (timerRef.current) clearInterval(timerRef.current);
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         const formData = new FormData();
         formData.append("audio", blob, "recording.webm");
         formData.append("lang", lang);
         try {
-          const res = await fetch("/api/voice/transcribe", { method: "POST", body: formData });
+          const res = await fetch("/api/onboarding/transcribe", { method: "POST", body: formData });
           if (res.ok) {
             const data = await res.json();
-            if (data.text) setAnswer(key, (answers[key] || "") + " " + data.text);
+            if (data.text) {
+              const key = question.key;
+              setAnswer(key, (answers[key] || "") + " " + data.text);
+            }
           }
         } catch { /* ignore */ }
         setRecording(false);
+        setRecordingTime(0);
       };
       mediaRef.current = mr;
       mr.start();
       setRecording(true);
     } catch { /* mic access denied */ }
-  }, [lang, answers, setAnswer]);
+  }, [lang, answers, question.key, setAnswer]);
 
   const stopVoice = useCallback(() => {
     mediaRef.current?.stop();
   }, []);
 
-  // ── Team Invite Handlers ───────────────────────────────────────────────────
-
-  const updateInvite = useCallback((idx: 0 | 1, field: keyof TeamInvite, value: string | string[]) => {
-    setInvites(prev => {
-      const next = [...prev] as [TeamInvite, TeamInvite];
-      next[idx] = { ...next[idx], [field]: value };
-      return next;
-    });
-    setInviteErrors(prev => { const n = [...prev] as [string, string]; n[idx] = ""; return n; });
-  }, []);
-
-  const togglePermission = useCallback((idx: 0 | 1, perm: string) => {
-    setInvites(prev => {
-      const next = [...prev] as [TeamInvite, TeamInvite];
-      const perms = next[idx].permissions.includes(perm)
-        ? next[idx].permissions.filter(p => p !== perm)
-        : [...next[idx].permissions, perm];
-      next[idx] = { ...next[idx], permissions: perms };
-      return next;
-    });
-  }, []);
-
-  const validateDomain = useCallback((email: string): boolean => {
-    const website = answers.websiteUrl || "";
-    const companyDomain = website.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-    if (!companyDomain || !email.includes("@")) return true; // can't validate
-    const emailDomain = email.split("@")[1];
-    return emailDomain === companyDomain;
-  }, [answers.websiteUrl]);
+  // ── Team Invite Handlers ────────────────────────────────────────────────────
 
   const sendInvites = useCallback(async () => {
     setSaving(true);
-    setInviteStatus("");
-    let allOk = true;
+    const errors: [string, string] = ["", ""];
+    let sent = false;
     for (let i = 0; i < 2; i++) {
       const inv = invites[i];
       if (!inv.email) continue;
-      if (!validateDomain(inv.email)) {
-        setInviteErrors(prev => {
-          const n = [...prev] as [string, string];
-          n[i as 0 | 1] = ui("domainMismatch", lang);
-          return n;
-        });
-        allOk = false;
-        continue;
-      }
       try {
-        const roleMap: Record<string, string> = {
-          "Admin": "Admin", "Manager": "Admin",
-          "Sales Rep": "SalesRep", "Viewer": "Viewer",
-        };
         const res = await fetch("/api/team", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: inv.email, role: roleMap[inv.role] || "SalesRep" }),
+          body: JSON.stringify({ email: inv.email, role: inv.role }),
         });
         if (!res.ok) {
           const data = await res.json();
-          setInviteErrors(prev => {
-            const n = [...prev] as [string, string];
-            n[i as 0 | 1] = data.error || "Failed";
-            return n;
-          });
-          allOk = false;
+          errors[i as 0 | 1] = data.error || "Failed";
+        } else {
+          sent = true;
         }
       } catch {
-        allOk = false;
+        errors[i as 0 | 1] = "Network error";
       }
     }
+    setInviteErrors(errors);
     setSaving(false);
-    setInviteStatus(allOk ? ui("invitesSent", lang) : ui("inviteFailed", lang));
-    if (allOk) setTimeout(() => goNext(), 1200);
-  }, [invites, validateDomain, lang, goNext]);
+    if (sent) setTimeout(() => void goNext(), 800);
+  }, [invites, goNext]);
 
-  // ── Confirm & Generate ─────────────────────────────────────────────────────
+  // ── Confirm & Generate ──────────────────────────────────────────────────────
 
   const handleConfirm = useCallback(async () => {
     setSaving(true);
-    // Save a marker that onboarding is complete
     try {
       await fetch("/api/onboarding/answers", {
         method: "POST",
@@ -315,444 +326,318 @@ export default function ConversationalOnboarding() {
     router.push("/dashboard");
   }, [router]);
 
-  // ── Check if step has required fields filled ──────────────────────────────
+  // ── Format time ─────────────────────────────────────────────────────────────
 
-  const isStepValid = useCallback((stepConfig: StepConfig): boolean => {
-    for (const q of stepConfig.questions) {
-      if (q.required && !answers[q.key]) return false;
-    }
-    return true;
-  }, [answers]);
+  const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // FIELD RENDERERS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═════════════════════════════════════════════════════════════════════════════
+  // RENDERERS
+  // ═════════════════════════════════════════════════════════════════════════════
 
-  function renderField(q: QuestionConfig): JSX.Element | null {
-    // Conditional visibility
-    if (q.showIf) {
-      const val = answers[q.showIf.key] || "";
-      const multiVals = (() => { try { return JSON.parse(val) as string[]; } catch { return [val]; } })();
-      const visible = q.showIf.values.some(v => multiVals.includes(v));
-      if (!visible) return null;
-    }
+  // ── Sparkle + Mic buttons ───────────────────────────────────────────────────
 
-    const label = t(q.label, lang);
-    const placeholder = q.placeholder ? t(q.placeholder, lang) : "";
-    const value = getAnswer(q.key);
+  function renderToolbar() {
+    if (question.type === "welcome_form" || question.type === "team_invite" || question.type === "review") return null;
+    return (
+      <div className="flex items-center gap-3 mt-6">
+        {/* AI Suggest */}
+        <button
+          type="button"
+          onClick={() => void handleAISuggest()}
+          disabled={aiLoading}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E6663]/20 border border-[#1E6663]/30 text-teal-300 text-sm hover:bg-[#1E6663]/30 transition disabled:opacity-50"
+        >
+          {aiLoading ? (
+            <span className="animate-spin text-base">⏳</span>
+          ) : (
+            <span className="text-base">✨</span>
+          )}
+          {aiLoading ? ui("aiGenerating", lang) : ui("aiSuggest", lang)}
+        </button>
 
-    const fieldLabel = (
-      <label className="block text-sm font-medium text-white/80 mb-1.5">
-        {label}
-        {q.required && <span className="text-red-400 ml-1">*</span>}
-      </label>
+        {/* Voice */}
+        {recording ? (
+          <button
+            type="button"
+            onClick={stopVoice}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-sm animate-pulse"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+            {fmtTime(recordingTime)} — {ui("recording", lang)}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void startVoice()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 text-sm hover:bg-white/10 transition"
+          >
+            <span className="text-base">🎤</span>
+          </button>
+        )}
+      </div>
     );
+  }
 
-    const aiButton = q.ai && (
-      <button
-        type="button"
-        onClick={() => void handleAISuggest(q)}
-        disabled={aiLoading === q.key}
-        className="text-xs px-3 py-1 rounded-full bg-teal-600/30 text-teal-300 hover:bg-teal-600/50 transition disabled:opacity-50"
-      >
-        {aiLoading === q.key ? ui("aiGenerating", lang) : ui("aiSuggest", lang)}
-      </button>
+  // ── Single Choice ───────────────────────────────────────────────────────────
+
+  function renderSingleChoice() {
+    const value = getAnswer(question.key);
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {question.options?.map(opt => {
+          const selected = value === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setAnswer(question.key, opt.value)}
+              className={`relative px-5 py-4 rounded-2xl text-left transition-all duration-200 border ${
+                selected
+                  ? "bg-[#1E6663]/25 border-[#1E6663] text-white shadow-lg shadow-[#1E6663]/20"
+                  : "bg-[#0d2626] border-white/10 text-white/70 hover:border-[#1E6663]/40 hover:bg-[#0d2626]/80"
+              }`}
+            >
+              <span className="font-medium">{optLabel(opt, lang)}</span>
+              {selected && (
+                <span className="absolute top-3 right-3 text-teal-400 text-lg">✓</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     );
+  }
 
-    const voiceButton = q.voice && (
-      <button
-        type="button"
-        onMouseDown={() => void startVoice(q.key)}
-        onMouseUp={stopVoice}
-        onTouchStart={() => void startVoice(q.key)}
-        onTouchEnd={stopVoice}
-        className={`text-xs px-3 py-1 rounded-full transition ${
-          recording ? "bg-red-500/40 text-red-300" : "bg-white/10 text-white/60 hover:bg-white/20"
-        }`}
-      >
-        {recording ? ui("voiceRecording", lang) : "🎤"}
-      </button>
+  // ── Multi Choice ────────────────────────────────────────────────────────────
+
+  function renderMultiChoice() {
+    const selected = getMulti(question.key);
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {question.options?.map(opt => {
+          const isSelected = selected.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggleMulti(question.key, opt.value)}
+              className={`relative px-5 py-4 rounded-2xl text-left transition-all duration-200 border ${
+                isSelected
+                  ? "bg-[#1E6663]/25 border-[#1E6663] text-white shadow-lg shadow-[#1E6663]/20"
+                  : "bg-[#0d2626] border-white/10 text-white/70 hover:border-[#1E6663]/40 hover:bg-[#0d2626]/80"
+              }`}
+            >
+              <span className="font-medium">{optLabel(opt, lang)}</span>
+              {isSelected && (
+                <span className="absolute top-3 right-3 text-teal-400 text-lg">✓</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     );
+  }
 
-    switch (q.type) {
-      case "short-text":
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <input
-              type="text"
-              value={value}
-              onChange={e => setAnswer(q.key, e.target.value)}
-              placeholder={placeholder}
-              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
+  // ── True/False ──────────────────────────────────────────────────────────────
+
+  function renderTrueFalse() {
+    const value = getAnswer(question.key);
+    return (
+      <div className="flex gap-4 justify-center">
+        {(["yes", "no"] as const).map(v => {
+          const selected = value === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setAnswer(question.key, v)}
+              className={`w-40 h-32 rounded-3xl text-2xl font-bold transition-all duration-200 border-2 ${
+                selected
+                  ? v === "yes"
+                    ? "bg-[#1E6663]/30 border-[#1E6663] text-teal-300 shadow-xl shadow-[#1E6663]/25"
+                    : "bg-red-500/15 border-red-500/50 text-red-300 shadow-xl shadow-red-500/15"
+                  : "bg-[#0d2626] border-white/10 text-white/50 hover:border-white/30"
+              }`}
+            >
+              {ui(v, lang)}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Range Slider ────────────────────────────────────────────────────────────
+
+  function renderRangeSlider() {
+    const value = Number(getAnswer(question.key)) || 0;
+    const max = question.sliderMax || 100;
+    const step = question.sliderStep || 1;
+    const unit = question.sliderUnit || "";
+    return (
+      <div className="space-y-8 py-4">
+        {/* Large number display */}
+        <div className="text-center">
+          <span className="text-7xl font-bold text-teal-400 tabular-nums">{value}</span>
+          {unit && <span className="text-2xl text-white/40 ml-3">{unit}</span>}
+        </div>
+        {/* Slider */}
+        <div className="px-4">
+          <input
+            type="range"
+            min={0}
+            max={max}
+            step={step}
+            value={value}
+            onChange={e => setAnswer(question.key, e.target.value)}
+            className="w-full h-3 rounded-full appearance-none cursor-pointer bg-white/10
+              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7
+              [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-teal-400
+              [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-teal-400/40
+              [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:rounded-full
+              [&::-moz-range-thumb]:bg-teal-400 [&::-moz-range-thumb]:border-0"
+          />
+          <div className="flex justify-between text-xs text-white/30 mt-2">
+            <span>0</span>
+            <span>{max}</span>
           </div>
-        );
+        </div>
+      </div>
+    );
+  }
 
-      case "long-text":
-        return (
-          <div key={q.key} className="space-y-1">
-            <div className="flex items-center justify-between">
-              {fieldLabel}
-              <div className="flex gap-2">
-                {voiceButton}
-                {aiButton}
-              </div>
+  // ── Welcome Form ────────────────────────────────────────────────────────────
+
+  function renderWelcomeForm() {
+    const fields: { key: string; label: string; type?: string; placeholder?: string }[] = [
+      { key: "firstName", label: ui("firstName", lang), placeholder: "John" },
+      { key: "lastName", label: ui("lastName", lang), placeholder: "Smith" },
+      { key: "companyName", label: ui("companyName", lang), placeholder: "Acme Inc" },
+      { key: "businessEmail", label: ui("businessEmail", lang), type: "email", placeholder: "john@acme.com" },
+      { key: "websiteUrl", label: ui("websiteUrl", lang), type: "url", placeholder: "https://acme.com" },
+    ];
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {fields.map(f => (
+            <div key={f.key} className={f.key === "websiteUrl" ? "sm:col-span-2" : ""}>
+              <label className="block text-sm font-medium text-white/60 mb-1.5">{f.label}</label>
+              <input
+                type={f.type || "text"}
+                value={answers[f.key] || ""}
+                onChange={e => setAnswer(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                className="w-full px-4 py-3 rounded-xl bg-[#0d2626] border border-white/10 text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-[#1E6663]/50 focus:border-[#1E6663]/50 transition"
+              />
             </div>
-            <textarea
-              value={value}
-              onChange={e => setAnswer(q.key, e.target.value)}
-              placeholder={placeholder}
-              rows={3}
-              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-none"
-            />
-          </div>
-        );
-
-      case "email":
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <input
-              type="email"
-              value={value}
-              onChange={e => setAnswer(q.key, e.target.value)}
-              placeholder={placeholder}
-              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
-          </div>
-        );
-
-      case "url":
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <input
-              type="url"
-              value={value}
-              onChange={e => setAnswer(q.key, e.target.value)}
-              placeholder={placeholder || "https://"}
-              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
-          </div>
-        );
-
-      case "numeric":
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <input
-              type="number"
-              value={value}
-              onChange={e => setAnswer(q.key, e.target.value)}
-              placeholder={placeholder}
-              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
-          </div>
-        );
-
-      case "year":
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <input
-              type="number"
-              min={1900}
-              max={2026}
-              value={value}
-              onChange={e => setAnswer(q.key, e.target.value)}
-              placeholder="2020"
-              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            />
-          </div>
-        );
-
-      case "single-select":
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <div className="flex flex-wrap gap-2">
-              {q.options?.map(opt => {
-                const selected = value === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setAnswer(q.key, opt.value)}
-                    className={`px-4 py-2 rounded-xl text-sm transition ${
-                      selected
-                        ? "bg-teal-500 text-white shadow-lg shadow-teal-500/25"
-                        : "bg-white/5 border border-white/10 text-white/70 hover:bg-white/10"
-                    }`}
-                  >
-                    {t(opt.label, lang)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-
-      case "true-false":
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <div className="flex gap-3">
-              {(["yes", "no"] as const).map(v => (
+          ))}
+        </div>
+        {/* Language toggle */}
+        <div>
+          <label className="block text-sm font-medium text-white/60 mb-1.5">{ui("language", lang)}</label>
+          <div className="flex gap-3">
+            {[
+              { v: "English", l: "English" },
+              { v: "العربية", l: "العربية" },
+            ].map(({ v, l }) => {
+              const selected = (answers.language || "English") === v;
+              return (
                 <button
                   key={v}
                   type="button"
-                  onClick={() => setAnswer(q.key, v)}
-                  className={`px-6 py-2 rounded-xl text-sm transition ${
-                    value === v
-                      ? "bg-teal-500 text-white shadow-lg shadow-teal-500/25"
-                      : "bg-white/5 border border-white/10 text-white/70 hover:bg-white/10"
+                  onClick={() => {
+                    setAnswer("language", v);
+                    setLang(v === "العربية" ? "ar" : "en");
+                  }}
+                  className={`px-6 py-3 rounded-xl font-medium transition border ${
+                    selected
+                      ? "bg-[#1E6663]/25 border-[#1E6663] text-white"
+                      : "bg-[#0d2626] border-white/10 text-white/50 hover:border-[#1E6663]/40"
                   }`}
                 >
-                  {ui(v, lang)}
+                  {l}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        );
-
-      case "multi-select":
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <div className="flex flex-wrap gap-2">
-              {q.options?.map(opt => {
-                const selected = getMulti(q.key).includes(opt.value);
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => toggleMulti(q.key, opt.value)}
-                    className={`px-4 py-2 rounded-xl text-sm transition ${
-                      selected
-                        ? "bg-teal-500 text-white shadow-lg shadow-teal-500/25"
-                        : "bg-white/5 border border-white/10 text-white/70 hover:bg-white/10"
-                    }`}
-                  >
-                    {t(opt.label, lang)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-
-      case "multi-select-detail": {
-        const detailKey = `${q.key}_detail`;
-        return (
-          <div key={q.key} className="space-y-2">
-            <div className="flex items-center justify-between">
-              {fieldLabel}
-              <div className="flex gap-2">{aiButton}</div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {q.options?.map(opt => {
-                const selected = getMulti(q.key).includes(opt.value);
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => toggleMulti(q.key, opt.value)}
-                    className={`px-4 py-2 rounded-xl text-sm transition ${
-                      selected
-                        ? "bg-teal-500 text-white shadow-lg shadow-teal-500/25"
-                        : "bg-white/5 border border-white/10 text-white/70 hover:bg-white/10"
-                    }`}
-                  >
-                    {t(opt.label, lang)}
-                  </button>
-                );
-              })}
-            </div>
-            {getMulti(q.key).length > 0 && (
-              <textarea
-                value={answers[detailKey] || ""}
-                onChange={e => setAnswer(detailKey, e.target.value)}
-                placeholder={ui("addDetails", lang)}
-                rows={2}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-none text-sm"
-              />
-            )}
-          </div>
-        );
-      }
-
-      case "ranking": {
-        const items: string[] = (() => {
-          try {
-            const parsed = JSON.parse(value) as string[];
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-          } catch { /* ignore */ }
-          return q.options?.map(o => o.value) || [];
-        })();
-
-        const moveItem = (idx: number, dir: -1 | 1) => {
-          const next = [...items];
-          const target = idx + dir;
-          if (target < 0 || target >= next.length) return;
-          [next[idx], next[target]] = [next[target], next[idx]];
-          setAnswer(q.key, JSON.stringify(next));
-        };
-
-        const optionMap = new Map(q.options?.map(o => [o.value, o]) || []);
-
-        return (
-          <div key={q.key} className="space-y-1">
-            {fieldLabel}
-            <div className="space-y-1.5">
-              {items.map((item, idx) => {
-                const opt = optionMap.get(item);
-                return (
-                  <div key={item} className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
-                    <span className="text-teal-400 font-bold text-sm w-6">{idx + 1}</span>
-                    <span className="flex-1 text-white/80 text-sm">
-                      {opt ? t(opt.label, lang) : item}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => moveItem(idx, -1)}
-                      disabled={idx === 0}
-                      className="text-white/40 hover:text-white disabled:opacity-20 text-xs px-1"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveItem(idx, 1)}
-                      disabled={idx === items.length - 1}
-                      className="text-white/40 hover:text-white disabled:opacity-20 text-xs px-1"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      }
-
-      default:
-        return null;
-    }
+        </div>
+      </div>
+    );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // TEAM INVITE RENDERER
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Team Invite ─────────────────────────────────────────────────────────────
 
-  function renderTeamInvite(): JSX.Element {
+  function renderTeamInvite() {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {([0, 1] as const).map(idx => (
-          <div key={idx} className="bg-white/5 rounded-2xl p-5 border border-white/10 space-y-3">
-            <h4 className="text-white font-semibold text-sm">
-              {ui("inviteTitle", lang, { n: String(idx + 1) })}
+          <div key={idx} className="bg-[#0d2626] rounded-2xl p-5 border border-white/10 space-y-4">
+            <h4 className="text-white/80 font-semibold text-sm">
+              {lang === "ar" ? `عضو ${idx + 1}` : `Member ${idx + 1}`}
             </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-white/60 mb-1 block">{ui("firstName", lang)}</label>
-                <input
-                  type="text"
-                  value={invites[idx].firstName}
-                  onChange={e => updateInvite(idx, "firstName", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/60 mb-1 block">{ui("lastName", lang)}</label>
-                <input
-                  type="text"
-                  value={invites[idx].lastName}
-                  onChange={e => updateInvite(idx, "lastName", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                />
-              </div>
-            </div>
             <div>
-              <label className="text-xs text-white/60 mb-1 block">{ui("jobTitle", lang)}</label>
-              <input
-                type="text"
-                value={invites[idx].jobTitle}
-                onChange={e => updateInvite(idx, "jobTitle", e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-white/60 mb-1 block">{ui("email", lang)}</label>
+              <label className="text-xs text-white/50 mb-1 block">Email</label>
               <input
                 type="email"
                 value={invites[idx].email}
-                onChange={e => updateInvite(idx, "email", e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                onChange={e => {
+                  setInvites(prev => {
+                    const next = [...prev] as [TeamInvite, TeamInvite];
+                    next[idx] = { ...next[idx], email: e.target.value };
+                    return next;
+                  });
+                  setInviteErrors(prev => { const n = [...prev] as [string, string]; n[idx] = ""; return n; });
+                }}
+                placeholder="colleague@company.com"
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-[#1E6663]/50 transition"
               />
               {inviteErrors[idx] && (
                 <p className="text-red-400 text-xs mt-1">{inviteErrors[idx]}</p>
               )}
             </div>
             <div>
-              <label className="text-xs text-white/60 mb-1 block">{ui("accessLevel", lang)}</label>
-              <div className="flex flex-wrap gap-2">
-                {TEAM_ROLES.map(role => (
-                  <button
-                    key={role.value}
-                    type="button"
-                    onClick={() => updateInvite(idx, "role", role.value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs transition ${
-                      invites[idx].role === role.value
-                        ? "bg-teal-500 text-white"
-                        : "bg-white/5 border border-white/10 text-white/60 hover:bg-white/10"
-                    }`}
-                  >
-                    {t(role.label, lang)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-white/60 mb-1 block">{ui("permissions", lang)}</label>
-              <div className="flex flex-wrap gap-1.5">
-                {TEAM_PERMISSIONS.map(perm => (
-                  <button
-                    key={perm.value}
-                    type="button"
-                    onClick={() => togglePermission(idx, perm.value)}
-                    className={`px-2.5 py-1 rounded-lg text-xs transition ${
-                      invites[idx].permissions.includes(perm.value)
-                        ? "bg-teal-600/40 text-teal-300 border border-teal-500/30"
-                        : "bg-white/5 border border-white/10 text-white/40 hover:bg-white/10"
-                    }`}
-                  >
-                    {t(perm.label, lang)}
-                  </button>
-                ))}
+              <label className="text-xs text-white/50 mb-1 block">Role</label>
+              <div className="flex gap-2">
+                {TEAM_ROLES.map(r => {
+                  const selected = invites[idx].role === r.value;
+                  return (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => {
+                        setInvites(prev => {
+                          const next = [...prev] as [TeamInvite, TeamInvite];
+                          next[idx] = { ...next[idx], role: r.value };
+                          return next;
+                        });
+                      }}
+                      className={`px-4 py-2 rounded-xl text-sm transition border ${
+                        selected
+                          ? "bg-[#1E6663]/25 border-[#1E6663] text-white"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                      }`}
+                    >
+                      {lang === "ar" ? r.ar : r.en}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
         ))}
-        {inviteStatus && (
-          <p className={`text-sm text-center ${inviteStatus.includes("sent") || inviteStatus.includes("تم") ? "text-green-400" : "text-red-400"}`}>
-            {inviteStatus}
-          </p>
-        )}
         <div className="flex gap-3">
           <button
             type="button"
             onClick={() => void sendInvites()}
             disabled={saving || (!invites[0].email && !invites[1].email)}
-            className="flex-1 py-3 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-400 transition disabled:opacity-40"
+            className="flex-1 py-3.5 rounded-xl bg-[#1E6663] text-white font-semibold hover:bg-[#1E6663]/80 transition disabled:opacity-40"
           >
             {saving ? ui("saving", lang) : ui("sendInvites", lang)}
           </button>
           <button
             type="button"
             onClick={() => void goNext()}
-            className="px-6 py-3 rounded-xl bg-white/10 text-white/70 hover:bg-white/15 transition"
+            className="px-6 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 transition"
           >
             {ui("skip", lang)}
           </button>
@@ -761,57 +646,55 @@ export default function ConversationalOnboarding() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // REVIEW RENDERER
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Review ──────────────────────────────────────────────────────────────────
 
-  function renderReview(): JSX.Element {
+  function renderReview() {
+    // Group answers by apiStep
+    const steps = new Map<number, { questions: Question[]; label: string }>();
+    for (const q of QUESTIONS) {
+      if (q.type === "welcome_form" || q.type === "team_invite" || q.type === "review") continue;
+      if (!answers[q.key]) continue;
+      if (!steps.has(q.apiStep)) {
+        steps.set(q.apiStep, { questions: [], label: `Step ${q.apiStep}` });
+      }
+      steps.get(q.apiStep)!.questions.push(q);
+    }
+
     return (
-      <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-        {STEPS.filter(s => s.id < 12).map(s => {
-          const stepAnswers = s.questions
-            .map(q => ({ q, val: answers[q.key] || "" }))
-            .filter(({ val }) => val);
-
-          return (
-            <div key={s.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-white font-semibold text-sm">{t(s.title, lang)}</h4>
-                <button
-                  type="button"
-                  onClick={() => goToStep(s.id)}
-                  className="text-xs text-teal-400 hover:text-teal-300"
-                >
-                  {ui("editSection", lang)}
-                </button>
-              </div>
-              {stepAnswers.length === 0 ? (
-                <p className="text-white/30 text-xs">{ui("noAnswers", lang)}</p>
-              ) : (
-                <div className="space-y-1">
-                  {stepAnswers.map(({ q, val }) => {
-                    let displayVal = val;
-                    try {
-                      const parsed = JSON.parse(val);
-                      if (Array.isArray(parsed)) displayVal = parsed.join(", ");
-                    } catch { /* plain string */ }
-                    return (
-                      <div key={q.key} className="text-xs">
-                        <span className="text-white/50">{t(q.label, lang)}: </span>
-                        <span className="text-white/80">{displayVal}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+      <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-2 scrollbar-thin">
+        {[...steps.entries()].map(([stepNum, { questions: qs }]) => (
+          <div key={stepNum} className="bg-[#0d2626] rounded-xl p-4 border border-white/10">
+            <div className="space-y-2">
+              {qs.map(q => {
+                let displayVal = answers[q.key] || "";
+                try {
+                  const parsed = JSON.parse(displayVal);
+                  if (Array.isArray(parsed)) {
+                    displayVal = parsed.map(v => {
+                      const opt = q.options?.find(o => o.value === v);
+                      return opt ? optLabel(opt, lang) : v;
+                    }).join(", ");
+                  }
+                } catch {
+                  const opt = q.options?.find(o => o.value === displayVal);
+                  if (opt) displayVal = optLabel(opt, lang);
+                }
+                return (
+                  <div key={q.key} className="flex justify-between items-start gap-4">
+                    <span className="text-white/40 text-xs shrink-0">{qTitle(q, lang)}</span>
+                    <span className="text-white/80 text-xs text-right">{displayVal}</span>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
+
         <button
           type="button"
           onClick={() => void handleConfirm()}
           disabled={saving}
-          className="w-full py-4 rounded-xl bg-gradient-to-r from-teal-500 to-teal-400 text-white font-bold text-lg hover:from-teal-400 hover:to-teal-300 transition shadow-lg shadow-teal-500/25 disabled:opacity-50"
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#1E6663] to-teal-500 text-white font-bold text-lg hover:opacity-90 transition shadow-xl shadow-[#1E6663]/30 disabled:opacity-50"
         >
           {saving ? ui("saving", lang) : ui("confirmGenerate", lang)}
         </button>
@@ -819,104 +702,91 @@ export default function ConversationalOnboarding() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // STEP CONTENT RENDERER
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Question content dispatcher ─────────────────────────────────────────────
 
-  function renderStepContent(): JSX.Element {
-    if (step.special === "team-invite") return renderTeamInvite();
-    if (step.special === "review") return renderReview();
-
-    // Language change handler for Step 0
-    const handleLangChange = (val: string) => {
-      setAnswer("language", val);
-      setLang(val === "العربية" ? "ar" : "en");
-    };
-
-    return (
-      <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-2">
-        {step.questions.map(q => {
-          // Special handling for language selector
-          if (q.key === "language") {
-            return (
-              <div key={q.key} className="space-y-1">
-                <label className="block text-sm font-medium text-white/80 mb-1.5">
-                  {t(q.label, lang)}
-                </label>
-                <div className="flex gap-3">
-                  {q.options?.map(opt => {
-                    const selected = answers.language === opt.value ||
-                      (!answers.language && opt.value === "English");
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => handleLangChange(opt.value)}
-                        className={`px-6 py-3 rounded-xl text-sm font-medium transition ${
-                          selected
-                            ? "bg-teal-500 text-white shadow-lg shadow-teal-500/25"
-                            : "bg-white/5 border border-white/10 text-white/70 hover:bg-white/10"
-                        }`}
-                      >
-                        {t(opt.label, lang)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          }
-          return renderField(q);
-        })}
-      </div>
-    );
+  function renderQuestionContent() {
+    switch (question.type) {
+      case "welcome_form": return renderWelcomeForm();
+      case "single_choice": return renderSingleChoice();
+      case "multi_choice": return renderMultiChoice();
+      case "true_false": return renderTrueFalse();
+      case "range_slider": return renderRangeSlider();
+      case "team_invite": return renderTeamInvite();
+      case "review": return renderReview();
+      default: return null;
+    }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PROGRESS BAR
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Check if current question has an answer ─────────────────────────────────
 
-  function renderProgress(): JSX.Element {
-    const pct = ((currentStep + 1) / totalSteps) * 100;
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs text-white/50">
-          <span>{ui("stepOf", lang, { current: String(currentStep + 1), total: String(totalSteps) })}</span>
-          <span>{Math.round(pct)}%</span>
-        </div>
-        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full"
-            initial={false}
-            animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.4 }}
-          />
-        </div>
-      </div>
-    );
-  }
+  const hasAnswer = useCallback((): boolean => {
+    if (question.type === "welcome_form") {
+      return !!(answers.firstName && answers.companyName && answers.businessEmail);
+    }
+    if (question.type === "team_invite" || question.type === "review") return true;
+    return !!answers[question.key];
+  }, [question, answers]);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MAIN LAYOUT
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═════════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════════════════════
+
+  const pct = ((currentQ + 1) / totalQ) * 100;
 
   return (
     <div
       dir={isRTL ? "rtl" : "ltr"}
-      className="min-h-screen gradient-hero flex items-center justify-center p-4"
+      className="min-h-screen bg-[#061a1a] flex flex-col"
     >
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="h-8 mx-auto mb-4 flex justify-center"><AvoraLogo variant="light" /></div>
-          {renderProgress()}
-        </div>
+      {/* ── Motivational Overlay ──────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showOverlay && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.4 }}
+            className="fixed inset-0 z-50 bg-[#061a1a]/95 flex items-center justify-center"
+          >
+            <div className="text-center">
+              <span className="text-7xl mb-6 block">{OVERLAY_MESSAGES[overlayIdx]?.emoji}</span>
+              <h2 className="text-3xl font-bold text-white mb-2">
+                {OVERLAY_MESSAGES[overlayIdx]?.text}
+              </h2>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Card */}
-        <div className="glass-dark rounded-3xl p-8 shadow-2xl border border-white/10 relative overflow-hidden">
+      {/* ── Top bar ───────────────────────────────────────────────────────────── */}
+      <div className="px-6 pt-5 pb-3">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-6 flex items-center">
+              <AvoraLogo variant="light" height={22} />
+            </div>
+            <span className="text-xs text-white/30">
+              {currentQ + 1} / {totalQ}
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-gradient-to-r from-[#1E6663] to-teal-400 rounded-full"
+              initial={false}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.4 }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main content ──────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center px-6 py-8">
+        <div className="w-full max-w-2xl">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
-              key={currentStep}
+              key={currentQ}
               custom={direction}
               variants={slideVariants}
               initial={hasMounted ? "enter" : false}
@@ -924,38 +794,45 @@ export default function ConversationalOnboarding() {
               exit="exit"
               transition={TRANSITION}
             >
-              {/* Step Title */}
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white">{t(step.title, lang)}</h2>
-                {step.subtitle && (
-                  <p className="text-white/50 text-sm mt-1">{t(step.subtitle, lang)}</p>
+              {/* Title */}
+              <div className="mb-8">
+                <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight">
+                  {qTitle(question, lang)}
+                </h1>
+                {qSubtitle(question, lang) && (
+                  <p className="text-white/40 mt-2 text-lg">
+                    {qSubtitle(question, lang)}
+                  </p>
                 )}
               </div>
 
-              {/* Step Content */}
-              {renderStepContent()}
+              {/* Content */}
+              {renderQuestionContent()}
 
-              {/* Navigation (not for team-invite or review — they have their own buttons) */}
-              {step.special !== "team-invite" && step.special !== "review" && (
-                <div className="flex items-center justify-between mt-8 pt-4 border-t border-white/10">
+              {/* Toolbar (AI + Voice) */}
+              {renderToolbar()}
+
+              {/* Navigation */}
+              {question.type !== "team_invite" && question.type !== "review" && (
+                <div className="flex items-center justify-between mt-10">
                   <button
                     type="button"
                     onClick={goBack}
-                    disabled={currentStep === 0}
-                    className="px-5 py-2.5 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition disabled:opacity-0 disabled:pointer-events-none"
+                    disabled={currentQ === 0}
+                    className="px-5 py-2.5 rounded-xl text-white/40 hover:text-white hover:bg-white/5 transition disabled:opacity-0 disabled:pointer-events-none text-sm"
                   >
                     {ui("back", lang)}
                   </button>
 
                   <div className="flex items-center gap-3">
                     {saving && (
-                      <span className="text-xs text-teal-400">{ui("saving", lang)}</span>
+                      <span className="text-xs text-teal-400/60">{ui("saving", lang)}</span>
                     )}
                     <button
                       type="button"
                       onClick={() => void goNext()}
-                      disabled={!isStepValid(step)}
-                      className="px-8 py-2.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-400 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-teal-500/25"
+                      disabled={!hasAnswer()}
+                      className="px-8 py-3 rounded-xl bg-[#1E6663] text-white font-semibold hover:bg-[#1E6663]/80 transition disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-[#1E6663]/25"
                     >
                       {ui("next", lang)}
                     </button>
@@ -963,13 +840,13 @@ export default function ConversationalOnboarding() {
                 </div>
               )}
 
-              {/* Review step: back button */}
-              {step.special === "review" && (
-                <div className="mt-4">
+              {/* Review: back button */}
+              {question.type === "review" && (
+                <div className="mt-6">
                   <button
                     type="button"
                     onClick={goBack}
-                    className="px-5 py-2.5 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition"
+                    className="px-5 py-2.5 rounded-xl text-white/40 hover:text-white hover:bg-white/5 transition text-sm"
                   >
                     {ui("back", lang)}
                   </button>
@@ -978,24 +855,24 @@ export default function ConversationalOnboarding() {
             </motion.div>
           </AnimatePresence>
         </div>
+      </div>
 
-        {/* Step nav dots */}
-        <div className="flex justify-center gap-1.5 mt-4">
-          {STEPS.map((_, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => goToStep(idx)}
-              className={`w-2 h-2 rounded-full transition ${
-                idx === currentStep
-                  ? "bg-teal-400 w-6"
-                  : idx < currentStep
-                    ? "bg-teal-600"
-                    : "bg-white/20"
-              }`}
-            />
-          ))}
-        </div>
+      {/* ── Bottom nav dots ───────────────────────────────────────────────────── */}
+      <div className="flex justify-center gap-1 pb-6 flex-wrap max-w-2xl mx-auto px-6">
+        {QUESTIONS.map((_, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => goToQuestion(idx)}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              idx === currentQ
+                ? "bg-teal-400 w-6"
+                : idx < currentQ
+                  ? "bg-[#1E6663]/60 w-1.5"
+                  : "bg-white/10 w-1.5"
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
