@@ -8,7 +8,7 @@ export default async function OnboardingLayout({
 }) {
   const session = await getSession();
   if (!session) {
-    redirect("/login?next=/onboarding/aria");
+    redirect("/login?next=/onboarding");
   }
   return <>{children}</>;
 }

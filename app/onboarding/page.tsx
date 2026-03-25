@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import ConversationalOnboarding from "@/components/onboarding/ConversationalOnboarding";
 
-// Old onboarding route → redirect to new ARIA-powered onboarding
 export default function OnboardingPage() {
-  redirect("/onboarding/aria");
+  return <ConversationalOnboarding />;
 }
