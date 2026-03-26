@@ -343,3 +343,23 @@ input:focus, textarea:focus, select:focus {
   padding: 4px 12px;
   display: inline-block;
 }
+
+/* ── Sidebar dark theme ───────────────────────────────────────── */
+.sidebar-dark {
+  background: #061a1a;
+}
+
+/* ── Pill tab indicator ───────────────────────────────────────── */
+.pill-indicator {
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Button press micro-interaction ───────────────────────────── */
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* ── Mixed theme: content area background ─────────────────────── */
+.bg-content-area {
+  background: #f8fafb;
+}
