@@ -1,5 +1,7 @@
 "use client";
+import { motion } from "framer-motion";
 import { Card } from "@/components/ui/Card";
+import { Search } from "lucide-react";
 
 // ── Types matching ai-engine.ts output ───────────────────────────────────────
 
@@ -69,18 +71,22 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 export function LookalikeTab({ data }: { data: Record<string, unknown> | null }) {
   if (!data) {
     return (
-      <div className="text-center py-12 text-gray-400">
-        No lookalike data yet. Generate your strategy first.
-      </div>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
+        <div className="w-16 h-16 bg-[#1A6B6B]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Search className="text-[#1A6B6B]" size={28} />
+        </div>
+        <h3 className="font-bold text-[#1F2A2A] text-lg mb-2">No lookalike data yet</h3>
+        <p className="text-gray-500 text-sm max-w-sm mx-auto">Generate your strategy first to discover similar companies.</p>
+      </motion.div>
     );
   }
 
   const lookalike = data as LookalikeData;
 
   return (
-    <div className="space-y-6">
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Disclaimer */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
         <p className="font-semibold text-blue-800 text-sm">
           🔍 Lookalike Account Intelligence
         </p>
@@ -106,9 +112,12 @@ export function LookalikeTab({ data }: { data: Record<string, unknown> | null })
           </h3>
           <div className="space-y-3">
             {lookalike.recommendedCompanies.map((co, i) => (
-              <div
+              <motion.div
                 key={i}
-                className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm card-hover"
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div>
@@ -160,7 +169,7 @@ export function LookalikeTab({ data }: { data: Record<string, unknown> | null })
                     <ScoreBar label="Triggers" value={co.scores.triggerFit} />
                   </div>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -269,6 +278,6 @@ export function LookalikeTab({ data }: { data: Record<string, unknown> | null })
           </div>
         </Card>
       )}
-    </div>
+    </motion.div>
   );
 }

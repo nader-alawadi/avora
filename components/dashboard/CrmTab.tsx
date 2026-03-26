@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
+import { Search, Mail, ExternalLink, MessageCircle, Phone, Filter, RefreshCw, Users2 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -272,45 +273,60 @@ function LeadCard({
             </div>
           )}
 
-          <p className="font-semibold text-[#1F2A2A] text-sm truncate leading-snug">
-            {lead.fullName || "Unnamed Lead"}
-          </p>
-          {lead.roleTitle && (
-            <p className="text-xs text-gray-500 truncate mt-0.5">{lead.roleTitle}</p>
-          )}
+          <div className="flex items-start gap-2.5 mb-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#1A6B6B] to-[#2D8080] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+              {(lead.fullName || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-[#1F2A2A] text-sm truncate leading-snug">
+                {lead.fullName || "Unnamed Lead"}
+              </p>
+              {lead.roleTitle && (
+                <p className="text-xs text-gray-500 truncate">{lead.roleTitle}</p>
+              )}
+            </div>
+          </div>
           {lead.company && (
-            <p className="text-xs text-[#1E6663] font-medium truncate mt-1">{lead.company}</p>
+            <p className="text-xs text-[#1A6B6B] font-medium truncate mb-2">{lead.company}</p>
           )}
 
-          {/* Contact chips */}
-          <div className="flex gap-1.5 mt-2.5 flex-wrap">
+          {/* Contact quick actions */}
+          <div className="flex gap-1.5 flex-wrap">
             {lead.email && (
-              <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                ✉ Email
-              </span>
-            )}
-            {lead.phone && (
-              <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full">
-                📞 Phone
-              </span>
+              <a href={`mailto:${lead.email}`} onClick={e => e.stopPropagation()} title="Email"
+                className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center text-blue-600 transition-colors">
+                <Mail size={13} />
+              </a>
             )}
             {lead.linkedinUrl && (
-              <span className="text-[10px] bg-blue-50 text-[#0a66c2] px-2 py-0.5 rounded-full">
-                in LinkedIn
-              </span>
+              <a href={lead.linkedinUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} title="LinkedIn"
+                className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center text-[#0a66c2] transition-colors">
+                <ExternalLink size={13} />
+              </a>
             )}
-            {lead.nextFollowUp && (
-              <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">
-                📅 {new Date(lead.nextFollowUp).toLocaleDateString()}
-              </span>
+            {lead.phone && (
+              <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} title="Phone"
+                className="w-7 h-7 rounded-lg bg-green-50 hover:bg-green-100 flex items-center justify-center text-green-600 transition-colors">
+                <Phone size={13} />
+              </a>
+            )}
+            {lead.whatsappAvailable && lead.phone && (
+              <a href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} title="WhatsApp"
+                className="w-7 h-7 rounded-lg bg-green-50 hover:bg-green-100 flex items-center justify-center text-green-600 transition-colors">
+                <MessageCircle size={13} />
+              </a>
             )}
           </div>
+          {lead.nextFollowUp && (
+            <p className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full mt-2 inline-block">
+              📅 {new Date(lead.nextFollowUp).toLocaleDateString()}
+            </p>
+          )}
 
-          {/* Dispute button — only shown when not already disputed and not readOnly */}
           {!isDisputed && !readOnly && (
             <button
               onClick={onDispute}
-              className="mt-2.5 text-[10px] font-semibold text-orange-500 hover:text-orange-700 hover:underline transition-colors"
+              className="mt-2 text-[10px] font-semibold text-orange-500 hover:text-orange-700 hover:underline transition-colors"
             >
               Dispute Lead
             </button>
@@ -571,6 +587,8 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<CrmLead | null>(null);
   const [disputingLead, setDisputingLead] = useState<CrmLead | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStage, setFilterStage] = useState<string | null>(null);
 
   const fetchLeads = useCallback(() => {
     fetch("/api/crm")
@@ -705,16 +723,32 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
     );
   }
 
+  // Filter leads
+  const getFilteredColumnLeads = (stageId: string) => {
+    let leads = columns[stageId] ?? [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      leads = leads.filter(l =>
+        (l.fullName || "").toLowerCase().includes(q) ||
+        (l.company || "").toLowerCase().includes(q) ||
+        (l.email || "").toLowerCase().includes(q)
+      );
+    }
+    return leads;
+  };
+
   if (totalLeads === 0) {
     return (
-      <div className="text-center py-16">
-        <div className="text-5xl mb-4">👥</div>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
+        <div className="w-20 h-20 bg-[#1A6B6B]/10 rounded-3xl flex items-center justify-center mx-auto mb-5">
+          <Users2 className="text-[#1A6B6B]" size={36} />
+        </div>
         <h3 className="font-bold text-[#1F2A2A] text-lg mb-2">CRM is empty</h3>
-        <p className="text-gray-500 text-sm max-w-sm mx-auto">
+        <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
           Your CRM will be populated automatically when leads are delivered by the AVORA team.
           Place a lead order to get started.
         </p>
-      </div>
+      </motion.div>
     );
   }
 
@@ -750,16 +784,26 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
         )}
       </AnimatePresence>
 
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-[#1F2A2A] text-lg">My CRM Pipeline</h2>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-400">{totalLeads} lead{totalLeads !== 1 ? "s" : ""} total</span>
-            <button
-              onClick={fetchLeads}
-              className="text-xs text-[#1E6663] hover:underline font-medium"
-            >
-              Refresh
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+        {/* Header with search */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="font-bold text-[#1F2A2A] text-lg">My CRM Pipeline</h2>
+            <p className="text-sm text-gray-400">{totalLeads} lead{totalLeads !== 1 ? "s" : ""} total</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+              <input
+                type="text"
+                placeholder="Search leads..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A6B6B]/30 focus:border-[#1A6B6B] transition w-48"
+              />
+            </div>
+            <button onClick={fetchLeads} className="p-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-[#1A6B6B] transition" title="Refresh">
+              <RefreshCw size={16} />
             </button>
           </div>
         </div>
@@ -767,7 +811,7 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: 500 }}>
             {STAGES.map((stage) => {
-              const leads = columns[stage.id] ?? [];
+              const leads = getFilteredColumnLeads(stage.id);
               const isWon = stage.id === "Won";
               const isLost = stage.id === "Lost";
 
@@ -843,7 +887,7 @@ export function CrmTab({ readOnly = false }: { readOnly?: boolean }) {
             })}
           </div>
         </DragDropContext>
-      </div>
+      </motion.div>
     </>
   );
 }

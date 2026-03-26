@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/Card";
+import { Send, Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
 
 // ── Types matching ai-engine.ts output ───────────────────────────────────────
 
@@ -233,21 +235,37 @@ function ColdCallScriptView({ script }: { script: ColdCallScript }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-all active:scale-95"
+    >
+      {copied ? <><Check size={12} className="text-green-500" /> Copied!</> : <><Copy size={12} /> Copy</>}
+    </button>
+  );
+}
+
 export function OutreachTab({ data }: { data: Record<string, unknown> | null }) {
   const [expandedChannel, setExpandedChannel] = useState<number | null>(0);
 
   if (!data) {
     return (
-      <div className="text-center py-12 text-gray-400">
-        No outreach data yet. Generate your strategy first.
-      </div>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
+        <div className="w-16 h-16 bg-[#1A6B6B]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Send className="text-[#1A6B6B]" size={28} />
+        </div>
+        <h3 className="font-bold text-[#1F2A2A] text-lg mb-2">No outreach data yet</h3>
+        <p className="text-gray-500 text-sm max-w-sm mx-auto">Generate your strategy first to see your outreach playbook.</p>
+      </motion.div>
     );
   }
 
   const outreach = data as OutreachData;
 
   return (
-    <div className="space-y-6">
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header info */}
       {(outreach.dialect || outreach.tone) && (
         <div className="flex gap-2 flex-wrap">
@@ -282,7 +300,8 @@ export function OutreachTab({ data }: { data: Record<string, unknown> | null }) 
       {outreach.channels && outreach.channels.length > 0 && (
         <div className="space-y-3">
           {outreach.channels.map((channel, i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+              className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm card-hover">
               <button
                 onClick={() => setExpandedChannel(expandedChannel === i ? null : i)}
                 className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
@@ -296,7 +315,7 @@ export function OutreachTab({ data }: { data: Record<string, unknown> | null }) 
                     </span>
                   )}
                 </div>
-                <span className="text-gray-400 text-sm">{expandedChannel === i ? "▲" : "▼"}</span>
+                {expandedChannel === i ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
               </button>
 
               {expandedChannel === i && (
@@ -340,10 +359,10 @@ export function OutreachTab({ data }: { data: Record<string, unknown> | null }) 
                   )}
                 </div>
               )}
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
